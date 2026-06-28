@@ -74,8 +74,8 @@ export const api = {
   updateWorkspace: (id: string, patch: { name?: string; accentColor?: string; workingDirectory?: string }) =>
     req<Workspace>(`/api/workspaces/${id}`, { method: "PUT", headers: j, body: JSON.stringify(patch) }),
 
-  createSurface: (wsId: string, name?: string) =>
-    req<Surface>(`/api/workspaces/${wsId}/surfaces`, { method: "POST", headers: j, body: JSON.stringify({ name }) }),
+  createSurface: (wsId: string, name?: string, shell?: string, type?: PaneType, url?: string) =>
+    req<Surface>(`/api/workspaces/${wsId}/surfaces`, { method: "POST", headers: j, body: JSON.stringify({ name, shell, type, url }) }),
   selectSurface: (wsId: string, sId: string) =>
     req<void>(`/api/workspaces/${wsId}/surfaces/${sId}/select`, { method: "POST" }),
   renameSurface: (wsId: string, sId: string, name: string) =>
@@ -83,8 +83,8 @@ export const api = {
   deleteSurface: (wsId: string, sId: string) =>
     req<void>(`/api/workspaces/${wsId}/surfaces/${sId}`, { method: "DELETE" }),
 
-  split: (wsId: string, sId: string, paneId: string, direction: "vertical" | "horizontal") =>
-    req<Surface>(`/api/workspaces/${wsId}/surfaces/${sId}/split`, { method: "POST", headers: j, body: JSON.stringify({ paneId, direction }) }),
+  split: (wsId: string, sId: string, paneId: string, direction: "vertical" | "horizontal", shell?: string, type?: PaneType, url?: string) =>
+    req<Surface>(`/api/workspaces/${wsId}/surfaces/${sId}/split`, { method: "POST", headers: j, body: JSON.stringify({ paneId, direction, shell, type, url }) }),
   closePane: (wsId: string, sId: string, paneId: string) =>
     req<Surface>(`/api/workspaces/${wsId}/surfaces/${sId}/panes/${paneId}`, { method: "DELETE" }),
   focusPane: (wsId: string, sId: string, paneId: string) =>
@@ -142,6 +142,15 @@ export const api = {
   sendAgentPrompt: (paneId: string, prompt: string, threadId?: string) =>
     req<{ ok: boolean; threadId?: string; error?: string }>("/api/agent/send", { method: "POST", headers: j, body: JSON.stringify({ paneId, prompt, threadId }) }),
 
+  // ── Agent threads ──────────────────────────────────────────────
+  getThreads: () => req<AgentThread[]>("/api/threads"),
+  getThreadMessages: (threadId: string) => req<AgentMessage[]>(`/api/threads/${threadId}/messages`),
+  createThread: (paneId: string) =>
+    req<AgentThread>("/api/threads", { method: "POST", headers: j, body: JSON.stringify({ paneId }) }),
+  deleteThread: (threadId: string) => req<void>(`/api/threads/${threadId}`, { method: "DELETE" }),
+  deleteThreadMessage: (threadId: string, messageId: string) =>
+    req<void>(`/api/threads/${threadId}/messages/${messageId}`, { method: "DELETE" }),
+
   // ── Quota ──────────────────────────────────────────────────────
   getQuota: () => req<QuotaSnapshot>("/api/quota"),
 
@@ -149,6 +158,10 @@ export const api = {
   getGitBranch: (cwd?: string) =>
     req<{ branch?: string; remote?: string }>(`/api/git/branch${cwd ? `?cwd=${encodeURIComponent(cwd)}` : ""}`),
   getPorts: (paneId: string) => req<number[]>(`/api/ports?paneId=${paneId}`),
+  closeClientTab: (clientTabId: string) =>
+    req<void>(`/api/browser/client-tab/${encodeURIComponent(clientTabId)}`, { method: "DELETE" }),
+  canEmbed: (url: string) =>
+    req<{ canEmbed: boolean; reason: string; xFrameOptions?: string }>(`/api/browser/can-embed?url=${encodeURIComponent(url)}`),
   updatePane: (wsId: string, sId: string, paneId: string, patch: { type?: string; url?: string; notes?: string }) =>
     req<Pane>(`/api/workspaces/${wsId}/surfaces/${sId}/panes/${paneId}`, { method: "PUT", headers: j, body: JSON.stringify(patch) }),
 
@@ -270,10 +283,44 @@ export interface QuotaRow {
   lastActivityLocal: string;
 }
 
+export interface AgentThread {
+  id: string;
+  workspaceId: string;
+  surfaceId: string;
+  paneId: string;
+  agentName: string;
+  title: string;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+  messageCount: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  compactionCount: number;
+  lastMessagePreview: string;
+}
+
+export interface AgentMessage {
+  id: string;
+  threadId: string;
+  createdAtUtc: string;
+  role: string;
+  content: string;
+  provider: string;
+  model: string;
+  toolName: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  isCompactionSummary: boolean;
+}
+
 export interface QuotaSnapshot {
   generatedAtUtc: string;
   windows: Record<string, { rows: QuotaRow[]; totalTokens: number; requests: number }>;
 }
+
+
 
 
 

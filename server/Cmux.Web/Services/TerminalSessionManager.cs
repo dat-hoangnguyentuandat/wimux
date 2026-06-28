@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text;
 using Cmux.Core.Models;
 using Cmux.Core.Services;
 using Cmux.Core.Terminal;
@@ -39,10 +40,13 @@ public sealed class TerminalSessionManager : IDisposable
         public ConcurrentDictionary<Guid, Func<byte[], Task>> Subscribers { get; } = new();
         public ConcurrentDictionary<Guid, Func<TerminalEvent, Task>> EventSubscribers { get; } = new();
         public readonly List<byte> RecentOutput = new();
+        public readonly Queue<TerminalInputTraceEntry> RecentInput = new();
         public readonly object OutputLock = new();
+        public readonly object InputLock = new();
     }
 
     public record TerminalEvent(string Type, string PaneId, string? Data = null);
+    public record TerminalInputTraceEntry(DateTimeOffset Timestamp, string Hex, string Text, string Escaped, int ByteCount);
 
     public bool Exists(string paneId) => _sessions.ContainsKey(paneId);
 
@@ -155,8 +159,69 @@ public sealed class TerminalSessionManager : IDisposable
 
     public void Write(string paneId, byte[] data)
     {
-        if (_sessions.TryGetValue(paneId, out var entry))
-            entry.Session.Write(data);
+        if (!_sessions.TryGetValue(paneId, out var entry)) return;
+        lock (entry.InputLock)
+            AddInputTraceLocked(entry, data);
+        entry.Session.Write(data);
+    }
+
+    private static void AddInputTraceLocked(SessionEntry entry, byte[] data)
+    {
+        var text = DecodeUtf8(data);
+        var trace = new TerminalInputTraceEntry(
+            DateTimeOffset.Now,
+            Convert.ToHexString(data).ToLowerInvariant(),
+            text,
+            EscapeControlText(text),
+            data.Length);
+
+        entry.RecentInput.Enqueue(trace);
+        while (entry.RecentInput.Count > 200)
+            entry.RecentInput.Dequeue();
+    }
+
+    public IReadOnlyList<TerminalInputTraceEntry> GetInputTrace(string paneId)
+    {
+        if (!_sessions.TryGetValue(paneId, out var entry)) return [];
+        lock (entry.InputLock)
+            return entry.RecentInput.ToArray();
+    }
+
+    public void ClearInputTrace(string paneId)
+    {
+        if (!_sessions.TryGetValue(paneId, out var entry)) return;
+        lock (entry.InputLock)
+            entry.RecentInput.Clear();
+    }
+
+    private static string DecodeUtf8(byte[] data)
+    {
+        try { return Encoding.UTF8.GetString(data); }
+        catch { return ""; }
+    }
+
+    private static string EscapeControlText(string text)
+    {
+        var sb = new StringBuilder();
+        foreach (var ch in text)
+        {
+            switch (ch)
+            {
+                case '': sb.Append("<ESC>"); break;
+                case '\b': sb.Append("<BS>"); break;
+                case '': sb.Append("<DEL>"); break;
+                case '\r': sb.Append("<CR>"); break;
+                case '\n': sb.Append("<LF>"); break;
+                case '\t': sb.Append("<TAB>"); break;
+                default:
+                    if (char.IsControl(ch))
+                        sb.Append($"<0x{(int)ch:x2}>");
+                    else
+                        sb.Append(ch);
+                    break;
+            }
+        }
+        return sb.ToString();
     }
 
     public void Resize(string paneId, int cols, int rows)
@@ -193,5 +258,3 @@ public sealed class TerminalSessionManager : IDisposable
         _sessions.Clear();
     }
 }
-
-

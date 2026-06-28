@@ -1,5 +1,6 @@
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using Cmux.Core.Config;
 using Cmux.Web.Services;
@@ -19,10 +20,31 @@ builder.Services.AddSingleton<Cmux.Core.Services.AgentQuotaService>();
 builder.Services.AddSingleton<Cmux.Core.Services.KnowledgeGraphService>();
 builder.Services.AddSingleton<Cmux.Web.Services.AgentRuntimeService>();
 builder.Services.AddSingleton<TerminalSessionManager>();
+builder.Services.AddSingleton<Cmux.Web.Services.Browser.IBrowserProvider>(_ => new Cmux.Web.Services.Browser.ChromeCdpProvider());
+builder.Services.AddSingleton<Cmux.Web.Services.Browser.BrowserManager>();
+builder.Services.AddHttpClient("frame-proxy", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36");
+});
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.SetIsOriginAllowed(_ => true).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
 var app = builder.Build();
+
+// Never let the browser cache index.html — otherwise a stale shell keeps
+// loading an old hashed JS bundle after an update.
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        var ct = context.Response.ContentType ?? "";
+        if (ct.Contains("text/html", StringComparison.OrdinalIgnoreCase))
+            context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+        return Task.CompletedTask;
+    });
+    await next();
+});
 
 app.UseCors();
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });
@@ -96,10 +118,23 @@ app.MapPost("/api/workspaces/{wsId}/surfaces", (AppStateStore store, string wsId
 {
     var ws = store.FindWorkspace(wsId);
     if (ws == null) return Results.NotFound();
-    var pane = new PaneDto { Type = "terminal" };
+    var paneType = string.IsNullOrWhiteSpace(req?.Type) ? "terminal" : req!.Type!;
+    var pane = new PaneDto
+    {
+        Type = paneType,
+        Shell = paneType == "terminal" ? req?.Shell : null,
+        Url = paneType == "web" ? req?.Url : null,
+        Title = paneType == "web" ? "Browser" : null,
+    };
+    var baseName = string.IsNullOrWhiteSpace(req?.Name) ? (paneType == "web" ? "Browser" : "Terminal") : req!.Name;
+    // Auto-number to avoid duplicate surface names (matching cmux2).
+    var usedNames = new HashSet<string>(ws.Surfaces.Select(s => s.Name));
+    var name = baseName;
+    for (int i = 2; usedNames.Contains(name); i++)
+        name = $"{baseName} {i}";
     var surface = new SurfaceDto
     {
-        Name = string.IsNullOrWhiteSpace(req?.Name) ? "Terminal" : req!.Name,
+        Name = name,
         Root = new SplitNodeDto { IsLeaf = true, PaneId = pane.Id },
         FocusedPaneId = pane.Id,
         Panes = { [pane.Id] = pane },
@@ -148,7 +183,14 @@ app.MapPost("/api/workspaces/{wsId}/surfaces/{sId}/split", (AppStateStore store,
     string? newId = null;
     store.Mutate(_ =>
     {
-        var pane = new PaneDto { Type = "terminal" };
+        var paneType = string.IsNullOrWhiteSpace(req.Type) ? "terminal" : req.Type!;
+        var pane = new PaneDto
+        {
+            Type = paneType,
+            Shell = paneType == "terminal" ? req.Shell : null,
+            Url = paneType == "web" ? req.Url : null,
+            Title = paneType == "web" ? "Browser" : null,
+        };
         newId = SplitTreeOps.Split(surface, req.PaneId, req.Direction, pane);
         if (newId != null) surface.FocusedPaneId = newId;
     });
@@ -256,6 +298,46 @@ app.MapGet("/api/logs", (Cmux.Core.Services.CommandLogService svc, string? date,
 });
 app.MapGet("/api/history", (CommandHistoryStore svc, string? paneId) =>
     Results.Json(string.IsNullOrWhiteSpace(paneId) ? svc.GetAll() : svc.Get(paneId), json));
+
+// Best-effort iframe proxy. This strips frame-blocking response headers and rewrites
+// relative URLs via <base>. Complex apps may still break due cookies/CORS/client CSP.
+app.MapGet("/api/frame-proxy", async (IHttpClientFactory factory, string url, HttpContext ctx) =>
+{
+    if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+        (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        return Results.BadRequest("Invalid url");
+
+    var client = factory.CreateClient("frame-proxy");
+    using var req = new HttpRequestMessage(HttpMethod.Get, uri);
+    req.Headers.Referrer = uri;
+    req.Headers.TryAddWithoutValidation("Accept", ctx.Request.Headers.Accept.ToString() is { Length: > 0 } accept ? accept : "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+    req.Headers.TryAddWithoutValidation("Accept-Language", ctx.Request.Headers.AcceptLanguage.ToString() is { Length: > 0 } lang ? lang : "en-US,en;q=0.9");
+
+    using var resp = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ctx.RequestAborted);
+    var mediaType = resp.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+    var bytes = await resp.Content.ReadAsByteArrayAsync(ctx.RequestAborted);
+
+    ctx.Response.Headers.CacheControl = "no-store";
+    ctx.Response.Headers.Remove("X-Frame-Options");
+    ctx.Response.Headers.Remove("Content-Security-Policy");
+    ctx.Response.Headers.Remove("Content-Security-Policy-Report-Only");
+    ctx.Response.Headers.Remove("Cross-Origin-Opener-Policy");
+    ctx.Response.Headers.Remove("Cross-Origin-Embedder-Policy");
+
+    if (mediaType.Contains("html", StringComparison.OrdinalIgnoreCase))
+    {
+        var html = Encoding.UTF8.GetString(bytes);
+        html = Regex.Replace(html, @"<meta[^>]+http-equiv\s*=\s*[""']?Content-Security-Policy[""']?[^>]*>", "", RegexOptions.IgnoreCase);
+        var baseTag = $"""<base href="{uri.GetLeftPart(UriPartial.Path)}">""";
+        html = Regex.IsMatch(html, "<head[^>]*>", RegexOptions.IgnoreCase)
+            ? Regex.Replace(html, "<head([^>]*)>", $"<head$1>{baseTag}", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100))
+            : baseTag + html;
+        return Results.Content(html, "text/html; charset=utf-8");
+    }
+
+    return Results.File(bytes, resp.Content.Headers.ContentType?.ToString() ?? mediaType);
+});
+
 app.MapGet("/api/transcripts", (Cmux.Core.Services.CommandLogService svc) =>
     Results.Json(svc.GetTerminalTranscripts(), json));
 app.MapGet("/api/transcripts/content", (Cmux.Core.Services.CommandLogService svc, string path) =>
@@ -264,6 +346,35 @@ app.MapPost("/api/panes/{paneId}/capture", (TerminalSessionManager term, string 
 {
     var file = term.CaptureTranscript(paneId, "manual");
     return file == null ? Results.NotFound() : Results.Json(new { file }, json);
+});
+app.MapGet("/api/panes/{paneId}/input-trace", (TerminalSessionManager term, string paneId) =>
+    Results.Json(term.GetInputTrace(paneId), json));
+app.MapDelete("/api/panes/{paneId}/input-trace", (TerminalSessionManager term, string paneId) =>
+{
+    term.ClearInputTrace(paneId);
+    return Results.Ok();
+});
+app.MapGet("/api/terminal/focused/input-trace", (AppStateStore store, TerminalSessionManager term) =>
+{
+    var ws = store.State.Workspaces.FirstOrDefault(w => w.Id == store.State.SelectedWorkspaceId)
+             ?? store.State.Workspaces.FirstOrDefault();
+    var surface = ws?.Surfaces.FirstOrDefault(s => s.Id == ws.SelectedSurfaceId)
+                  ?? ws?.Surfaces.FirstOrDefault();
+    var paneId = surface?.FocusedPaneId;
+    return string.IsNullOrWhiteSpace(paneId)
+        ? Results.NotFound()
+        : Results.Json(new { paneId, items = term.GetInputTrace(paneId) }, json);
+});
+app.MapDelete("/api/terminal/focused/input-trace", (AppStateStore store, TerminalSessionManager term) =>
+{
+    var ws = store.State.Workspaces.FirstOrDefault(w => w.Id == store.State.SelectedWorkspaceId)
+             ?? store.State.Workspaces.FirstOrDefault();
+    var surface = ws?.Surfaces.FirstOrDefault(s => s.Id == ws.SelectedSurfaceId)
+                  ?? ws?.Surfaces.FirstOrDefault();
+    var paneId = surface?.FocusedPaneId;
+    if (string.IsNullOrWhiteSpace(paneId)) return Results.NotFound();
+    term.ClearInputTrace(paneId);
+    return Results.Ok();
 });
 
 // ── Snippets ────────────────────────────────────────────────────────
@@ -397,8 +508,24 @@ app.MapGet("/api/agents/conversation", (string sessionFilePath, int? max) =>
 // ── Agent conversation threads ──────────────────────────────────────
 app.MapGet("/api/threads", (Cmux.Core.Services.AgentConversationStoreService svc) =>
     Results.Json(svc.GetAllThreads(), json));
+app.MapPost("/api/threads", (Cmux.Core.Services.AgentConversationStoreService svc, AgentRuntimeService agent, AppStateStore store, AgentThreadCreateReq req) =>
+{
+    var ctx = store.FindPaneContext(req.PaneId);
+    var thread = svc.CreateThread(
+        ctx?.Workspace.Id ?? "",
+        ctx?.Surface.Id ?? "",
+        req.PaneId,
+        SettingsService.Current.Agent.AgentName);
+    if (ctx != null)
+        agent.SetActiveThreadId(ctx.Workspace.Id, ctx.Surface.Id, req.PaneId, thread.Id);
+    return Results.Json(thread, json);
+});
 app.MapGet("/api/threads/{id}/messages", (Cmux.Core.Services.AgentConversationStoreService svc, string id) =>
     Results.Json(svc.GetMessages(id), json));
+app.MapDelete("/api/threads/{threadId}/messages/{messageId}", (Cmux.Core.Services.AgentConversationStoreService svc, string threadId, string messageId) =>
+    svc.DeleteMessage(threadId, messageId) ? Results.Ok() : Results.NotFound());
+app.MapDelete("/api/threads/{id}", (Cmux.Core.Services.AgentConversationStoreService svc, string id) =>
+    svc.DeleteThread(id) ? Results.Ok() : Results.NotFound());
 
 // ── Workspace environment variables ─────────────────────────────────
 app.MapGet("/api/workspaces/{id}/env", (AppStateStore store, string id) =>
@@ -603,6 +730,7 @@ app.Map("/ws/terminal/{paneId}", async (HttpContext ctx, TerminalSessionManager 
     var cols = int.TryParse(ctx.Request.Query["cols"], out var c) ? c : 120;
     var rows = int.TryParse(ctx.Request.Query["rows"], out var r) ? r : 30;
     var cwd = ctx.Request.Query["cwd"].FirstOrDefault();
+    var shellArg = ctx.Request.Query["shell"].FirstOrDefault();
 
     using var socket = await ctx.WebSockets.AcceptWebSocketAsync();
     var sendLock = new SemaphoreSlim(1, 1);
@@ -616,7 +744,16 @@ app.Map("/ws/terminal/{paneId}", async (HttpContext ctx, TerminalSessionManager 
     }
 
     var existed = term.Exists(paneId);
-    term.GetOrCreate(paneId, cols, rows, cwd, null);
+    string? startCommand = null;
+    if (!string.IsNullOrWhiteSpace(shellArg)) startCommand = shellArg;
+    else
+    {
+        foreach (var ws2 in store.State.Workspaces)
+            foreach (var s2 in ws2.Surfaces)
+                if (s2.Panes.TryGetValue(paneId, out var p2) && !string.IsNullOrWhiteSpace(p2.Shell))
+                    startCommand = p2.Shell;
+    }
+    term.GetOrCreate(paneId, cols, rows, cwd, startCommand);
 
     // Replay buffered output so reconnects/refreshes see prior content.
     var recent = term.GetRecentOutput(paneId);
@@ -701,6 +838,7 @@ app.Map("/ws/terminal/{paneId}", async (HttpContext ctx, TerminalSessionManager 
         }
     };
 }
+app.MapBrowserEndpoints();
 app.MapFallbackToFile("index.html");
 
 app.Run();
@@ -708,13 +846,14 @@ app.Run();
 // ── Request records ─────────────────────────────────────────────────
 record CreateWorkspaceReq(string? Name, string? WorkingDirectory);
 record UpdateWorkspaceReq(string? Name, string? AccentColor, string? WorkingDirectory);
-record CreateSurfaceReq(string? Name);
+record CreateSurfaceReq(string? Name, string? Shell, string? Type, string? Url);
 record RenameReq(string Name);
-record SplitReq(string PaneId, string Direction);
+record SplitReq(string PaneId, string Direction, string? Shell, string? Type, string? Url);
 record RatioReq(string NodeId, double Ratio);
 record NotifyReq(string? WorkspaceId, string? SurfaceId, string? PaneId, string? Title, string? Subtitle, string? Body);
 record UpdatePaneReq(string? Type, string? Url, string? Notes);
 record AgentSecretReq(string Name, string? Value);
+record AgentThreadCreateReq(string PaneId);
 record AgentSendReq(string PaneId, string Prompt, string? ThreadId);
 
 public partial class Program
@@ -727,6 +866,9 @@ public partial class Program
             ?? (node.Second != null ? FindNodeById(node.Second, id) : null);
     }
 }
+
+
+
 
 
 

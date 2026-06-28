@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
+using Cmux.Web.Services;
 using FluentAssertions;
 using Xunit;
 
@@ -137,6 +138,29 @@ public class TerminalE2ETests : IClassFixture<RealServerFixture>
         ws.State.Should().Be(WebSocketState.Open);
     }
 
+    [Fact]
+    public async Task RawModeCli_ReceivesVietnameseUtf8Input()
+    {
+        var paneId = "rt-raw-vn-" + Guid.NewGuid().ToString("N");
+        var js = "process.stdin.setRawMode(true);process.stdin.resume();let b=[];process.stdin.on('data',d=>{for(const x of d){if(x===13){const buf=Buffer.from(b);console.log('RAWHEX='+buf.toString('hex'));process.exit(0);}else b.push(x);}});";
+        var shell = "node -e \"" + js + "\"";
+        var uri = new Uri($"{_fx.BaseWs}/ws/terminal/{paneId}?cols=80&rows=24&shell={Uri.EscapeDataString(shell)}");
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(uri, CancellationToken.None);
+
+        var text = "gõ tiếng Việt đậm dấu";
+        await SendInputAsync(ws, text + "\r");
+        var output = await ReadUntilAsync(ws, "RAWHEX=", TimeSpan.FromSeconds(20));
+
+        var marker = "RAWHEX=";
+        var idx = output.IndexOf(marker, StringComparison.Ordinal);
+        idx.Should().BeGreaterThanOrEqualTo(0);
+        var actualHex = new string(output[(idx + marker.Length)..]
+            .TakeWhile(Uri.IsHexDigit)
+            .ToArray());
+        actualHex.Should().Be(Convert.ToHexString(Encoding.UTF8.GetBytes(text)).ToLowerInvariant());
+    }
+
     // ── helpers ─────────────────────────────────────────────
     // NOTE: cancelling ReceiveAsync with a per-iteration token aborts a .NET
     // ClientWebSocket, so we use one overall deadline token and a background
@@ -159,6 +183,12 @@ public class TerminalE2ETests : IClassFixture<RealServerFixture>
         deadline.Cancel();
         try { await sender; } catch { /* ignore */ }
         return result;
+    }
+
+    private static async Task SendInputAsync(ClientWebSocket ws, string text)
+    {
+        var payload = Encoding.UTF8.GetBytes("i" + Enc(text));
+        await ws.SendAsync(payload, WebSocketMessageType.Text, true, CancellationToken.None);
     }
 
     private static async Task<string> ReadUntilAsync(ClientWebSocket ws, string marker, TimeSpan timeout)

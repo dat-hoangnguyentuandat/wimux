@@ -13,6 +13,7 @@ public class PaneDto
     public string? WorkingDirectory { get; set; }
     public string? Url { get; set; }
     public string? Notes { get; set; }
+    public string? Shell { get; set; }
 }
 
 public class SplitNodeDto
