@@ -40,6 +40,7 @@ export interface BrowserViewHandle {
   back(): void;
   forward(): void;
   reload(): void;
+  focus(): void;
 }
 
 export const BrowserView = forwardRef<BrowserViewHandle, Props>(function BrowserView({ url, tabId, adoptCdpTabId, onMeta, onPopup, onPopupClosed }: Props, ref) {
@@ -136,6 +137,9 @@ export const BrowserView = forwardRef<BrowserViewHandle, Props>(function Browser
           retries = 0;
           setStatus("live");
           sendViewport();
+          sendWs({ t: "focus" });
+          window.setTimeout(() => sendWs({ t: "focus" }), 120);
+          window.setTimeout(() => sendViewport(), 180);
           flushPendingMessages();
         } else if (type === "P") {
           try {
@@ -145,6 +149,11 @@ export const BrowserView = forwardRef<BrowserViewHandle, Props>(function Browser
           try {
             onPopupClosedRef.current?.(JSON.parse(body) as { cdpTabId: string });
           } catch { /* ignore malformed popup close */ }
+        } else if (type === "C") {
+          try {
+            const copy = JSON.parse(body) as { text?: string };
+            if (copy.text) navigator.clipboard.writeText(copy.text).catch(() => {});
+          } catch { /* ignore malformed clipboard payload */ }
         } else if (type === "E") {
           setError(body);
           setStatus("error");
@@ -187,6 +196,7 @@ export const BrowserView = forwardRef<BrowserViewHandle, Props>(function Browser
     back: () => sendWs({ t: "back" }),
     forward: () => sendWs({ t: "forward" }),
     reload: () => sendWs({ t: "reload" }),
+    focus: () => sendWs({ t: "focus" }),
   }), [sendWs]);
 
   const toTabCoords = (e: React.MouseEvent) => {
@@ -203,6 +213,10 @@ export const BrowserView = forwardRef<BrowserViewHandle, Props>(function Browser
 
 
   const onMouse = (type: string) => (e: React.MouseEvent) => {
+    if (type === "mousePressed") {
+      imgRef.current?.focus();
+      sendWs({ t: "focus" });
+    }
     const { x, y } = toTabCoords(e);
     sendWs({ t: "mouse", type, x, y, button: cdpButton(e.button), clickCount: type === "mousePressed" ? (e.detail || 1) : 0 });
   };
@@ -215,7 +229,26 @@ export const BrowserView = forwardRef<BrowserViewHandle, Props>(function Browser
 
   const onKey = (type: string) => (e: React.KeyboardEvent) => {
     if (["Tab", " ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
-    const printable = e.key.length === 1 ? e.key : undefined;
+    const key = e.key.toLowerCase();
+    const shortcut = (e.ctrlKey || e.metaKey) && !e.altKey;
+    if (type === "keyDown" && shortcut && key === "c") {
+      e.preventDefault();
+      sendWs({ t: "copy" });
+      return;
+    }
+    if (type === "keyDown" && shortcut && key === "v") {
+      e.preventDefault();
+      navigator.clipboard.readText()
+        .then((text) => { if (text) sendWs({ t: "paste", text }); })
+        .catch(() => {});
+      return;
+    }
+    if (shortcut && (key === "c" || key === "v")) {
+      e.preventDefault();
+      return;
+    }
+    const ctrlLike = e.ctrlKey || e.metaKey || e.altKey;
+    const printable = !ctrlLike && e.key.length === 1 ? e.key : undefined;
     sendWs({
       t: "key",
       type,
@@ -223,6 +256,10 @@ export const BrowserView = forwardRef<BrowserViewHandle, Props>(function Browser
       code: e.code,
       keyCode: e.keyCode,
       text: type === "keyDown" ? printable : undefined,
+      altKey: e.altKey,
+      ctrlKey: e.ctrlKey,
+      metaKey: e.metaKey,
+      shiftKey: e.shiftKey,
     });
   };
 

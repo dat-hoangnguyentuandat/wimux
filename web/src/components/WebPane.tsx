@@ -402,6 +402,7 @@ export function WebPane({ wsId, sId, paneId, url }: Props) {
   const setLiveHandle = useCallback((tabId: string, h: BrowserViewHandle | null) => {
     liveRefs.current[tabId] = h;
     if (!h) return;
+    if (activeIdRef.current === tabId) h.focus();
     setTabs((rows) => {
       const target = rows.find((tab) => tab.id === tabId);
       if (!target || target.liveSession) return rows;
@@ -410,6 +411,10 @@ export function WebPane({ wsId, sId, paneId, url }: Props) {
       ));
     });
   }, []);
+
+  useEffect(() => {
+    liveRefs.current[activeId]?.focus();
+  }, [activeId]);
 
   const openPopupTab = useCallback((popup: { cdpTabId: string; url: string }) => {
     if (adoptedPopupIdsRef.current.has(popup.cdpTabId)) {

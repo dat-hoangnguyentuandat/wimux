@@ -22,8 +22,6 @@ public sealed class BrowserScreencastSession : IAsyncDisposable
     private Uri? _devToolsListUri;
     private int _cmdId;
     private int _browserCmdId;
-    private long _lastUserInputTicks;
-    private int _popupScanRunning;
     // In-flight CDP request id -> completion (filled by HandleMessage when the
     // matching response arrives; consumed by GetNavigationHistoryAsync).
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, TaskCompletionSource<JsonNode?>> _pending = new();
@@ -39,6 +37,9 @@ public sealed class BrowserScreencastSession : IAsyncDisposable
 
     /// <summary>Raised when a browser target disappears.</summary>
     public event Func<string, Task>? PopupTargetClosed;
+
+    /// <summary>Raised when text is copied out of the remote page.</summary>
+    public event Func<string, Task>? ClipboardTextReceived;
 
     // Reserved CDP command id used to poll the live document title/URL.
     private const int MetaEvalId = 1_000_000;
@@ -139,32 +140,6 @@ public sealed class BrowserScreencastSession : IAsyncDisposable
         }
         catch { /* best-effort popup discovery */ }
         return rows;
-    }
-
-    private void MarkUserInput()
-    {
-        Interlocked.Exchange(ref _lastUserInputTicks, DateTime.UtcNow.Ticks);
-        if (Interlocked.CompareExchange(ref _popupScanRunning, 1, 0) == 0)
-            _ = Task.Run(() => ScanForNewTargetsAfterUserInput(CancellationToken.None));
-    }
-
-    private async Task ScanForNewTargetsAfterUserInput(CancellationToken ct)
-    {
-        try
-        {
-            while (!ct.IsCancellationRequested)
-            {
-                var last = new DateTime(Interlocked.Read(ref _lastUserInputTicks), DateTimeKind.Utc);
-                if (DateTime.UtcNow - last > TimeSpan.FromSeconds(5)) return;
-
-                foreach (var (id, url) in await ListPageTargetsAsync(ct))
-                    await NotifyNewTargetIfNeeded(id, url);
-
-                await Task.Delay(250, ct);
-            }
-        }
-        catch { /* scanner must not break the session */ }
-        finally { Interlocked.Exchange(ref _popupScanRunning, 0); }
     }
 
     /// <summary>Ask the page for its current document.title + location.href.</summary>
@@ -315,17 +290,10 @@ public sealed class BrowserScreencastSession : IAsyncDisposable
         if (!string.IsNullOrEmpty(targetId) &&
             targetId != _tabId &&
             string.Equals(type, "page", StringComparison.OrdinalIgnoreCase) &&
-            (openerId == _tabId || UserInputIsRecent()))
+            openerId == _tabId)
         {
             await NotifyNewTargetIfNeeded(targetId, url);
         }
-    }
-
-    private bool UserInputIsRecent()
-    {
-        var ticks = Interlocked.Read(ref _lastUserInputTicks);
-        if (ticks <= 0) return false;
-        return DateTime.UtcNow - new DateTime(ticks, DateTimeKind.Utc) <= TimeSpan.FromSeconds(5);
     }
 
     private async Task NotifyNewTargetIfNeeded(string targetId, string url)
@@ -340,7 +308,6 @@ public sealed class BrowserScreencastSession : IAsyncDisposable
 
     public Task DispatchMouseAsync(string type, double x, double y, string button, int clickCount, double deltaX, double deltaY, CancellationToken ct)
     {
-        if (type == "mousePressed") MarkUserInput();
         var p = new JsonObject
         {
             ["type"] = type,
@@ -357,16 +324,38 @@ public sealed class BrowserScreencastSession : IAsyncDisposable
         return SendAsync("Input.dispatchMouseEvent", p, ct);
     }
 
-    public Task DispatchKeyAsync(string type, string key, string code, int keyCode, string? text, CancellationToken ct)
+    public Task DispatchKeyAsync(
+        string type,
+        string key,
+        string code,
+        int keyCode,
+        string? text,
+        bool altKey,
+        bool ctrlKey,
+        bool metaKey,
+        bool shiftKey,
+        CancellationToken ct)
     {
-        if (type == "keyDown" || type == "rawKeyDown") MarkUserInput();
+        var modifiers = 0;
+        if (altKey) modifiers |= 1;
+        if (ctrlKey) modifiers |= 2;
+        if (metaKey) modifiers |= 4;
+        if (shiftKey) modifiers |= 8;
+
+        // Browser accelerators such as Ctrl+C / Ctrl+V are non-text key events
+        // in CDP. Sending them as text input prevents Chromium from treating
+        // them like native shortcuts.
+        var cdpType = type == "keyDown" && string.IsNullOrEmpty(text)
+            ? "rawKeyDown"
+            : type;
         var p = new JsonObject
         {
-            ["type"] = type,
+            ["type"] = cdpType,
             ["key"] = key,
             ["code"] = code,
             ["windowsVirtualKeyCode"] = keyCode,
             ["nativeVirtualKeyCode"] = keyCode,
+            ["modifiers"] = modifiers,
         };
         if (!string.IsNullOrEmpty(text))
         {
@@ -374,6 +363,35 @@ public sealed class BrowserScreencastSession : IAsyncDisposable
             if (type == "keyDown") p["type"] = "keyDown";
         }
         return SendAsync("Input.dispatchKeyEvent", p, ct);
+    }
+
+    public Task FocusAsync(CancellationToken ct)
+        => SendAsync("Page.bringToFront", null, ct);
+
+    public async Task CopySelectionAsync(CancellationToken ct)
+    {
+        var result = await EvaluateAsync("""
+(() => {
+  const active = document.activeElement;
+  if (active && (
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement)) {
+    const start = active.selectionStart ?? 0;
+    const end = active.selectionEnd ?? 0;
+    if (end > start) return active.value.substring(start, end);
+  }
+  return globalThis.getSelection ? globalThis.getSelection().toString() : "";
+})()
+""", ct);
+        var text = result?["result"]?["value"]?.GetValue<string>() ?? "";
+        if (!string.IsNullOrEmpty(text) && ClipboardTextReceived != null)
+            await ClipboardTextReceived(text);
+    }
+
+    public Task PasteTextAsync(string text, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(text)) return Task.CompletedTask;
+        return SendAsync("Input.insertText", new JsonObject { ["text"] = text }, ct);
     }
 
     public Task NavigateAsync(string url, CancellationToken ct)
@@ -396,18 +414,9 @@ public sealed class BrowserScreencastSession : IAsyncDisposable
 
     private async Task<(int currentIndex, List<int> entryIds)?> GetNavigationHistoryAsync(CancellationToken ct)
     {
-        var id = Interlocked.Increment(ref _cmdId);
-        var tcs = new TaskCompletionSource<JsonNode?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _pending[id] = tcs;
         try
         {
-            var cmd = new JsonObject { ["id"] = id, ["method"] = "Page.getNavigationHistory", ["params"] = new JsonObject() };
-            await SendRawAsync(cmd, ct);
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
-            JsonNode? result = null;
-            using (linked.Token.Register(() => tcs.TrySetResult(null)))
-                result = await tcs.Task;
+            var result = await SendCommandForResultAsync("Page.getNavigationHistory", new JsonObject(), ct);
             var arr = result?["entries"] as JsonArray;
             var current = result?["currentIndex"]?.GetValue<int>();
             if (arr == null || current == null) return null;
@@ -415,6 +424,35 @@ public sealed class BrowserScreencastSession : IAsyncDisposable
             foreach (var e in arr)
                 if (e?["id"]?.GetValue<int>() is int eid) ids.Add(eid);
             return (current.Value, ids);
+        }
+        catch { return null; }
+    }
+
+    private Task<JsonNode?> EvaluateAsync(string expression, CancellationToken ct)
+        => SendCommandForResultAsync("Runtime.evaluate", new JsonObject
+        {
+            ["expression"] = expression,
+            ["returnByValue"] = true,
+        }, ct);
+
+    private async Task<JsonNode?> SendCommandForResultAsync(string method, JsonNode? @params, CancellationToken ct)
+    {
+        var id = Interlocked.Increment(ref _cmdId);
+        var tcs = new TaskCompletionSource<JsonNode?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pending[id] = tcs;
+        try
+        {
+            var cmd = new JsonObject
+            {
+                ["id"] = id,
+                ["method"] = method,
+                ["params"] = @params ?? new JsonObject(),
+            };
+            await SendRawAsync(cmd, ct);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
+            using (linked.Token.Register(() => tcs.TrySetResult(null)))
+                return await tcs.Task;
         }
         finally { _pending.TryRemove(id, out _); }
     }

@@ -144,6 +144,7 @@ one process.
 - Source tree browser with file preview — `Ctrl+Shift+O`
 - Broadcast input to all panes — `Ctrl+Alt+B`
 - In-terminal search — `Ctrl+Shift+F`
+- Quick write in the focused terminal — `Shift+W`
 - Pane focus navigation (`Ctrl+Alt+Arrow`) and zoom (`Ctrl+Shift+Z`)
 - Workspace templates browser — `Ctrl+Shift+T`
 - Built-in AI agent runtime (OpenAI/Anthropic/Gemini-compatible) with streaming chat — `Ctrl+Shift+J`

@@ -71,7 +71,7 @@ export function AgentsPanel({ onClose, onSend }: Props) {
           <span className="cmux-spacer" />
         </div>
       </div>
-      <div className="cmux-panel-body cmux-split-body">
+      <div className="cmux-panel-body cmux-split-body cmux-wide-split-body">
         <div className="cmux-list">
           {filtered.length === 0 && <div className="cmux-empty">No agents detected</div>}
           {filtered.map((a) => (

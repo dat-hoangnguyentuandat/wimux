@@ -26,7 +26,7 @@ export function QuotaPanel({ onClose }: { onClose: () => void }) {
   }), { requests: 0, input: 0, output: 0, total: 0 }) ?? { requests: 0, input: 0, output: 0, total: 0 };
 
   return (
-    <div className="cmux-panel">
+    <div className="cmux-panel cmux-wide-data-panel cmux-quota-panel">
       <div className="cmux-panel-toolbar">
         <div className="cmux-panel-toolbar-row">
           <label>Window</label>
@@ -37,7 +37,7 @@ export function QuotaPanel({ onClose }: { onClose: () => void }) {
           <span className="cmux-spacer" />
         </div>
       </div>
-      <div className="cmux-panel-body cmux-quota-body">
+      <div className="cmux-panel-body cmux-quota-body cmux-wide-data-body">
         <div className="cmux-quota-summary">
           <div><div className="cmux-stat-label">Requests</div><div className="cmux-stat">{totals.requests.toLocaleString()}</div></div>
           <div><div className="cmux-stat-label">Input Tokens</div><div className="cmux-stat">{totals.input.toLocaleString()}</div></div>

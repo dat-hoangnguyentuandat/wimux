@@ -416,7 +416,6 @@ function WorkspacesContent() {
         >
           <button onClick={() => { const w = menu.workspace; setMenu(null); startRename(w); }}>Rename<span>F2</span></button>
           <button onClick={() => { const w = menu.workspace; setMenu(null); void duplicate(w); }}>Duplicate</button>
-          <button disabled>Set Workspace Icon</button>
           <button onClick={() => { setMenu(null); d.selectWorkspace(menu.workspace.id); }}>Select Workspace</button>
           <button onClick={() => { setMenu(null); d.selectWorkspace(menu.workspace.id); d.newSurface(); }}>New Surface<span>Ctrl+T</span></button>
           <button onClick={() => { setMenu(null); d.openNotifications(); }}>Notifications</button>

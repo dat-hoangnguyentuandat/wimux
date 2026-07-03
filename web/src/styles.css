@@ -759,12 +759,13 @@ select.set-input { cursor: pointer; }
 .cmux-surface-slot .tab { min-width: unset; height: 100%; padding: 0 10px; border-radius: 0; background: transparent; }
 .cmux-surface-slot .tab.active { background: var(--panel); }
 .cmux-surface-slot .tab-add { height: 100%; padding: 0 8px; font-size: 14px; border-radius: 0; }
-.docked-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: auto; }
+.docked-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; min-width: 0; }
 .docked-panel > .cmux-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-width: 620px;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   background: var(--bg);
 }
@@ -772,7 +773,7 @@ select.set-input { cursor: pointer; }
 .cmux-panel-toolbar { display: flex; flex-direction: column; gap: 8px; padding: 12px 12px 8px; border-bottom: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
 .cmux-panel-toolbar-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .cmux-panel-title { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--text-dim); }
-.cmux-panel-body { flex: 1; overflow: auto; padding: 10px; min-height: 0; }
+.cmux-panel-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px; min-height: 0; min-width: 0; }
 .cmux-panel-footer { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
 .cmux-spacer { flex: 1; }
 .cmux-icon-btn { background: transparent; border: 0; color: var(--text-dim); cursor: pointer; padding: 4px 6px; border-radius: 4px; font-size: 14px; display: inline-grid; place-items: center; }
@@ -831,7 +832,15 @@ select.set-input { cursor: pointer; }
 .cmux-list-row { display: flex; align-items: center; justify-content: space-between; }
 .cmux-list-title { font-size: 13px; }
 .cmux-list-meta { font-size: 11px; }
-.cmux-split-body { display: flex; min-width: 596px; min-height: 0; padding: 10px 12px; gap: 8px; }
+.cmux-split-body { display: flex; min-width: 0; min-height: 0; padding: 10px 12px; gap: 8px; }
+.cmux-wide-split-body { overflow: auto; }
+.cmux-wide-split-body > .cmux-list,
+.cmux-wide-split-body > .cmux-tree {
+  flex-basis: 280px;
+}
+.cmux-wide-split-body > .cmux-split-content {
+  min-width: 320px;
+}
 .cmux-split-divider { width: 1px; background: var(--border); }
 .cmux-split-content { flex: 1; overflow: auto; padding: 8px 12px; min-width: 0; border: 1px solid var(--border); background: var(--panel); }
 .cmux-mono-pre { font-family: "Cascadia Code", Consolas, monospace; font-size: 11px; color: var(--text-dim); }
@@ -844,7 +853,7 @@ select.set-input { cursor: pointer; }
 
 /* ── Quota panel ── */
 .cmux-quota-body { overflow: auto; padding: 8px 12px; }
-.cmux-quota-summary { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.cmux-quota-summary { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
 .cmux-stat { text-align: center; }
 .cmux-stat-label { font-size: 10px; color: var(--text-dim); }
 .cmux-footer-summary { font-size: 11px; color: var(--text-dim); }
@@ -877,8 +886,34 @@ select.set-input { cursor: pointer; }
 .cmux-preview-header { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
 
 /* ── List items ── */
-.cmux-list-body { flex: 1; overflow: auto; padding: 8px 0; }
+.cmux-list-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 0; }
 .cmux-list-tag { background: rgba(129,140,248,0.15); color: var(--accent); font-size: 10px; padding: 2px 6px; border-radius: 3px; }
+
+/* Wide data panels keep horizontal scrolling local to their content. */
+.cmux-wide-data-body { overflow: auto; padding: 8px 0; }
+.cmux-wide-data-panel .cmux-grid { min-width: 920px; }
+.cmux-command-logs-panel .cmux-grid { min-width: 1120px; }
+.cmux-wide-data-panel .cmux-panel-footer { flex-wrap: wrap; }
+
+/* Workspace settings are form-like and should fit narrow dock columns. */
+.cmux-workspace-settings .cmux-panel-body { overflow-x: hidden; }
+.cmux-workspace-settings textarea { max-width: 100%; }
+.cmux-ssh-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cmux-ssh-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  padding: 10px 36px 10px 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 6px;
+  min-width: 0;
+}
+.cmux-ssh-card input { width: 100%; min-width: 0; }
+.cmux-ssh-identity, .cmux-ssh-preview { grid-column: 1 / -1; }
+.cmux-ssh-preview { overflow-wrap: anywhere; font-size: 11px; }
+.cmux-ssh-remove { position: absolute; top: 8px; right: 8px; }
 
 /* ── Generic form elements (scoped to cmux panels, not dockview) ── */
 .cmux-panel input, .cmux-panel select, .cmux-panel textarea,

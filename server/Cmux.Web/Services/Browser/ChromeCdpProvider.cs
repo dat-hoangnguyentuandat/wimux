@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.WebSockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -91,7 +92,8 @@ public sealed class ChromeCdpProvider : IBrowserProvider
             {
                 FileName = exe,
                 UseShellExecute = false,
-                CreateNoWindow = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
             };
             psi.ArgumentList.Add($"--remote-debugging-port={_debugPort}");
             psi.ArgumentList.Add($"--user-data-dir={profileDir}");
@@ -115,9 +117,86 @@ public sealed class ChromeCdpProvider : IBrowserProvider
             psi.ArgumentList.Add("--disable-background-timer-throttling");
             psi.ArgumentList.Add("about:blank");
             _browserProcess = Process.Start(psi);
+            HideBrowserWindowsSoon();
             return true;
         }
         catch { return false; }
+    }
+
+    private void HideBrowserWindowsSoon()
+    {
+        var proc = _browserProcess;
+        if (proc == null) return;
+        try
+        {
+            if (!proc.HasExited)
+                _ = Task.Run(() => HideLaunchedBrowserWindowsAsync(proc.Id, CancellationToken.None));
+        }
+        catch { /* browser may have exited while checking */ }
+    }
+
+    private static async Task HideLaunchedBrowserWindowsAsync(int rootProcessId, CancellationToken ct)
+    {
+        // Chromium creates its UI window after process startup, often in a child
+        // process. Poll briefly and remove only this launch's windows from the
+        // taskbar. Do not SW_HIDE: a fully hidden Chrome window can stop painting
+        // newly-created tabs, which leaves the CDP screencast white until the
+        // user forces another activation.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
+        while (DateTime.UtcNow < deadline && !ct.IsCancellationRequested)
+        {
+            var processIds = GetProcessTreeIds(rootProcessId);
+            EnumWindows((hwnd, _) =>
+            {
+                if (!IsWindowVisible(hwnd)) return true;
+                GetWindowThreadProcessId(hwnd, out var pid);
+                if (processIds.Contains((int)pid))
+                    HideWindowFromTaskbar(hwnd);
+                return true;
+            }, IntPtr.Zero);
+            await Task.Delay(250, ct).ConfigureAwait(false);
+        }
+    }
+
+    private static void HideWindowFromTaskbar(IntPtr hwnd)
+    {
+        var exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+        var next = (exStyle.ToInt64() & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
+        SetWindowLongPtr(hwnd, GWL_EXSTYLE, new IntPtr(next));
+        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
+
+    private static HashSet<int> GetProcessTreeIds(int rootProcessId)
+    {
+        var parentByPid = new Dictionary<int, int>();
+        var snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snapshot == INVALID_HANDLE_VALUE) return new HashSet<int> { rootProcessId };
+        try
+        {
+            var entry = new PROCESSENTRY32 { dwSize = (uint)Marshal.SizeOf<PROCESSENTRY32>() };
+            if (Process32First(snapshot, ref entry))
+            {
+                do
+                {
+                    parentByPid[(int)entry.th32ProcessID] = (int)entry.th32ParentProcessID;
+                } while (Process32Next(snapshot, ref entry));
+            }
+        }
+        finally { CloseHandle(snapshot); }
+
+        var ids = new HashSet<int> { rootProcessId };
+        var changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var (pid, parentPid) in parentByPid)
+            {
+                if (!ids.Contains(pid) && ids.Contains(parentPid))
+                    changed |= ids.Add(pid);
+            }
+        }
+        return ids;
     }
 
     /// <summary>
@@ -238,6 +317,7 @@ public sealed class ChromeCdpProvider : IBrowserProvider
         resp.EnsureSuccessStatusCode();
 
         var node = JsonNode.Parse(await resp.Content.ReadAsStringAsync(ct));
+        HideBrowserWindowsSoon();
         return MapTab(node) ?? throw new InvalidOperationException("Failed to parse new tab response.");
     }
 
@@ -250,6 +330,7 @@ public sealed class ChromeCdpProvider : IBrowserProvider
     public async Task FocusTabAsync(string tabId, CancellationToken ct = default)
     {
         await _http.GetAsync($"{_devToolsBase}/json/activate/{tabId}", ct);
+        HideBrowserWindowsSoon();
     }
 
     public async Task ReloadTabAsync(string tabId, CancellationToken ct = default)
@@ -357,6 +438,65 @@ public sealed class ChromeCdpProvider : IBrowserProvider
         await QuitAsync(CancellationToken.None);
         _http.Dispose();
         _launchLock.Dispose();
+    }
+
+    private const uint TH32CS_SNAPPROCESS = 0x00000002;
+    private const int GWL_EXSTYLE = -20;
+    private const long WS_EX_APPWINDOW = 0x00040000L;
+    private const long WS_EX_TOOLWINDOW = 0x00000080L;
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_FRAMECHANGED = 0x0020;
+    private static readonly IntPtr INVALID_HANDLE_VALUE = new(-1);
+
+    private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr hObject);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct PROCESSENTRY32
+    {
+        public uint dwSize;
+        public uint cntUsage;
+        public uint th32ProcessID;
+        public IntPtr th32DefaultHeapID;
+        public uint th32ModuleID;
+        public uint cntThreads;
+        public uint th32ParentProcessID;
+        public int pcPriClassBase;
+        public uint dwFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        public string szExeFile;
     }
 }
 

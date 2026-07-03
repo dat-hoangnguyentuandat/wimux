@@ -62,7 +62,7 @@ export function SessionVaultPanel({ workspace, onClose }: Props) {
           <span className="dim">{items.length} entries</span>
         </div>
       </div>
-      <div className="cmux-panel-body cmux-split-body">
+      <div className="cmux-panel-body cmux-split-body cmux-wide-split-body">
         <div className="cmux-list">
           {filtered.length === 0 && <div className="cmux-empty">No captured transcripts</div>}
           {filtered.map((t) => (

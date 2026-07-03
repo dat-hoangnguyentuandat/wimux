@@ -43,6 +43,7 @@ const SHORTCUTS: [string, string][] = [
   ["Ctrl+B", "Toggle sidebar"],
   ["Ctrl+I", "Notification panel"],
   ["Ctrl+Shift+F", "Search in terminal"],
+  ["Shift+W", "Quick write in focused terminal"],
   ["Ctrl+Shift+P", "Command palette"],
   ["Ctrl+Shift+A", "Toggle agent chat"],
   ["Ctrl+Shift+L", "Open command logs"],
