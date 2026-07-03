@@ -58,7 +58,7 @@ export function CommandLogsPanel({ workspace, onClose, onInsert, onOpenVault }: 
   };
 
   return (
-    <div className="cmux-panel">
+    <div className="cmux-panel cmux-wide-data-panel cmux-command-logs-panel">
       <div className="cmux-panel-toolbar">
         <div className="cmux-panel-toolbar-row">
           <label>Date</label>
@@ -76,7 +76,7 @@ export function CommandLogsPanel({ workspace, onClose, onInsert, onOpenVault }: 
           <button className="cmux-btn" onClick={() => { setQuery(""); }}>Clear</button>
         </div>
       </div>
-      <div className="cmux-panel-body cmux-list-body">
+      <div className="cmux-panel-body cmux-list-body cmux-wide-data-body cmux-command-logs-body">
         <table className="cmux-grid">
           <thead>
             <tr>

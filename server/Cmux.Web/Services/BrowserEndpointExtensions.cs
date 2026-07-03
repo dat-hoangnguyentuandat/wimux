@@ -210,9 +210,23 @@ public static class BrowserEndpointExtensions
                 {
                     await Send("X" + JsonSerializer.Serialize(new { cdpTabId = popupTabId }, JsonOpts));
                 };
+                cast.ClipboardTextReceived += async (text) =>
+                    await Send("C" + JsonSerializer.Serialize(new { text }, JsonOpts));
                 await cast.StartAsync(target.Value.debuggerWsUrl, target.Value.tabId, initialWidth, initialHeight, initialDpr, CancellationToken.None);
                 if (string.IsNullOrEmpty(adopt) && !string.IsNullOrWhiteSpace(url) && url != "about:blank")
+                {
                     await cast.NavigateAsync(url, CancellationToken.None);
+                    await cast.FocusAsync(CancellationToken.None);
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await Task.Delay(180);
+                            await cast.FocusAsync(CancellationToken.None);
+                        }
+                        catch { /* tab may close while the delayed focus is pending */ }
+                    });
+                }
                 await Send("R" + target.Value.tabId); // ready + resolved tab id
 
                 var buf = new byte[1 << 15];
@@ -360,7 +374,22 @@ public static class BrowserEndpointExtensions
                         node["key"]?.GetValue<string>() ?? "",
                         node["code"]?.GetValue<string>() ?? "",
                         node["keyCode"]?.GetValue<int>() ?? 0,
-                        node["text"]?.GetValue<string>(), ct);
+                        node["text"]?.GetValue<string>(),
+                        node["altKey"]?.GetValue<bool>() == true,
+                        node["ctrlKey"]?.GetValue<bool>() == true,
+                        node["metaKey"]?.GetValue<bool>() == true,
+                        node["shiftKey"]?.GetValue<bool>() == true,
+                        ct);
+                    break;
+                case "focus":
+                    await cast.FocusAsync(ct);
+                    break;
+                case "copy":
+                    await cast.CopySelectionAsync(ct);
+                    break;
+                case "paste":
+                    var text = node["text"]?.GetValue<string>();
+                    if (!string.IsNullOrEmpty(text)) await cast.PasteTextAsync(text, ct);
                     break;
                 case "viewport":
                     await cast.SetViewportAsync(
@@ -370,7 +399,11 @@ public static class BrowserEndpointExtensions
                     break;
                 case "navigate":
                     var navUrl = node["url"]?.GetValue<string>();
-                    if (!string.IsNullOrEmpty(navUrl)) await cast.NavigateAsync(navUrl, ct);
+                    if (!string.IsNullOrEmpty(navUrl))
+                    {
+                        await cast.NavigateAsync(navUrl, ct);
+                        await cast.FocusAsync(ct);
+                    }
                     break;
                 case "reload":
                     await cast.ReloadAsync(ct);

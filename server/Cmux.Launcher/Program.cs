@@ -12,7 +12,7 @@ namespace Cmux.Launcher;
 /// </summary>
 internal static class Program
 {
-    internal const string CurrentVersion = "0.1.2";
+    internal const string CurrentVersion = "0.1.3";
 
     [STAThread]
     private static int Main(string[] args)

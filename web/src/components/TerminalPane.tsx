@@ -35,6 +35,10 @@ function WritePopup({
   }, [onClose]);
 
   useLayoutEffect(() => {
+    if (placed) inputRef.current?.focus();
+  }, [placed]);
+
+  useLayoutEffect(() => {
     const el = popupRef.current;
     if (!el) return;
     const margin = 8;
@@ -176,6 +180,7 @@ export function TerminalPane(props: Props) {
   const mouseTrackingRef = useRef(false);
   const rightClickAlwaysMenuRef = useRef(false);
   const quickWriteEnabledRef = useRef(true);
+  const lastTypeablePointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
 
   // Default to the legacy behaviour (TUI apps keep their own right-click =
   // paste; Shift+Right opens cmux's menu). Only opt into "always menu" when the
@@ -217,6 +222,12 @@ export function TerminalPane(props: Props) {
     writeInput("\x0c");
   };
 
+  const openWriteAt = (x: number, y: number) => {
+    setWritePos({ x, y });
+    setAnchorPos(null);
+    setWriteOpen(true);
+  };
+
   useEffect(() => {
     const term = new Terminal({
       fontFamily: `${fontFamily}, "Cascadia Code", Consolas, monospace`,
@@ -252,6 +263,23 @@ export function TerminalPane(props: Props) {
     let lastCopiedAt = 0;
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
+      if (
+        quickWriteEnabledRef.current &&
+        !mouseTrackingRef.current &&
+        e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey &&
+        (e.key === "W" || e.key === "w")
+      ) {
+        const lastPointer = lastTypeablePointerRef.current;
+        const r = paneRef.current?.getBoundingClientRect();
+        e.preventDefault();
+        e.stopPropagation();
+        props.onFocusRequest();
+        openWriteAt(
+          lastPointer?.clientX ?? (r ? r.left + Math.min(r.width / 2, Math.max(24, r.width - 24)) : window.innerWidth / 2),
+          lastPointer?.clientY ?? (r ? r.top + Math.min(r.height / 2, Math.max(24, r.height - 24)) : window.innerHeight / 2)
+        );
+        return false;
+      }
       // Plain Ctrl+C / Ctrl+Insert — copy if a selection exists, else let
       // xterm deliver ETX to the pty. Skip combos that carry Shift/Alt/Meta
       // because those are different shortcuts in TUIs (e.g. Shift+Tab).
@@ -442,14 +470,23 @@ export function TerminalPane(props: Props) {
       if (!quickWriteEnabledRef.current) return;
       if (mouseTrackingRef.current) return;
       if (!containerRef.current || !containerRef.current.contains(e.target as Node)) return;
+      lastTypeablePointerRef.current = { clientX: e.clientX, clientY: e.clientY };
       const r = (paneRef.current ?? containerRef.current).getBoundingClientRect();
       setAnchorPos({ x: e.clientX - r.left, y: e.clientY - r.top });
       props.onFocusRequest();
     };
+    const onDocumentPointerMove = (e: PointerEvent) => {
+      if (!quickWriteEnabledRef.current) return;
+      if (mouseTrackingRef.current) return;
+      if (!containerRef.current || !containerRef.current.contains(e.target as Node)) return;
+      lastTypeablePointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+    };
     document.addEventListener('click', onDocumentClick);
+    document.addEventListener('pointermove', onDocumentPointerMove);
 
     return () => {
       document.removeEventListener('click', onDocumentClick);
+      document.removeEventListener('pointermove', onDocumentPointerMove);
       unregister();
       ro.disconnect();
       wrapperEl.removeEventListener("mousedown", onRightMouseDown, { capture: true } as any);
@@ -576,12 +613,6 @@ export function TerminalPane(props: Props) {
     void action();
   };
 
-  const openWriteAt = (x: number, y: number) => {
-    setWritePos({ x, y });
-    setAnchorPos(null);
-    setWriteOpen(true);
-  };
-
   const sendWritePopup = (text: string) => {
     writeInput(text);
     setWriteDraft("");
@@ -609,6 +640,7 @@ export function TerminalPane(props: Props) {
           if (e.button !== 0) return;
           if (!quickWriteEnabledRef.current) return;
           if (mouseTrackingRef.current) return;
+          lastTypeablePointerRef.current = { clientX: e.clientX, clientY: e.clientY };
           const r = paneRef.current!.getBoundingClientRect();
           setAnchorPos({ x: e.clientX - r.left, y: e.clientY - r.top });
           props.onFocusRequest();

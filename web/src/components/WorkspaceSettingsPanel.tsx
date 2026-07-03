@@ -47,7 +47,7 @@ export function WorkspaceSettingsPanel({ workspace, onClose }: Props) {
   };
 
   return (
-    <div className="cmux-panel">
+    <div className="cmux-panel cmux-workspace-settings">
       <div className="cmux-panel-toolbar">
         <div className="cmux-panel-toolbar-row">
           <span className="cmux-panel-title">SSH / ENV</span>
@@ -69,22 +69,19 @@ export function WorkspaceSettingsPanel({ workspace, onClose }: Props) {
       )}
       {tab === "ssh" && (
         <div className="cmux-panel-body">
-          <table className="cmux-grid">
-            <thead><tr><th>Name</th><th>User</th><th>Host</th><th style={{ width: 80 }}>Port</th><th>Identity file</th><th>Preview</th><th></th></tr></thead>
-            <tbody>
-              {ssh.map((p) => (
-                <tr key={p.id}>
-                  <td><input value={p.name} onChange={(e) => updateProfile(p.id, { name: e.target.value })} /></td>
-                  <td><input style={{ width: 80 }} value={p.user} onChange={(e) => updateProfile(p.id, { user: e.target.value })} /></td>
-                  <td><input value={p.host} onChange={(e) => updateProfile(p.id, { host: e.target.value })} /></td>
-                  <td><input type="number" style={{ width: 70 }} value={p.port} onChange={(e) => updateProfile(p.id, { port: Number(e.target.value) })} /></td>
-                  <td><input value={p.identityFile ?? ""} onChange={(e) => updateProfile(p.id, { identityFile: e.target.value })} /></td>
-                  <td className="mono dim">{buildCommand(p)}</td>
-                  <td><button className="cmux-icon-btn" onClick={() => removeProfile(p.id)} title="Remove profile"><TrashIcon /></button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="cmux-ssh-list">
+            {ssh.map((p) => (
+              <div className="cmux-ssh-card" key={p.id}>
+                <label className="cmux-field"><span>Name</span><input value={p.name} onChange={(e) => updateProfile(p.id, { name: e.target.value })} /></label>
+                <label className="cmux-field"><span>User</span><input value={p.user} onChange={(e) => updateProfile(p.id, { user: e.target.value })} /></label>
+                <label className="cmux-field"><span>Host</span><input value={p.host} onChange={(e) => updateProfile(p.id, { host: e.target.value })} /></label>
+                <label className="cmux-field"><span>Port</span><input type="number" value={p.port} onChange={(e) => updateProfile(p.id, { port: Number(e.target.value) })} /></label>
+                <label className="cmux-field cmux-ssh-identity"><span>Identity file</span><input value={p.identityFile ?? ""} onChange={(e) => updateProfile(p.id, { identityFile: e.target.value })} /></label>
+                <div className="cmux-ssh-preview mono dim">{buildCommand(p)}</div>
+                <button className="cmux-icon-btn cmux-ssh-remove" onClick={() => removeProfile(p.id)} title="Remove profile"><TrashIcon /></button>
+              </div>
+            ))}
+          </div>
           <div className="cmux-modal-actions">
             <button onClick={addProfile}><PlusIcon /> Add profile</button>
             <span className="cmux-spacer" />

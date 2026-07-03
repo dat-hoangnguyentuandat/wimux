@@ -40,7 +40,7 @@ export function TemplatesPanel({ onClose, workspaceId, workspaceName, onApplied 
           <button className="cmux-icon-btn" onClick={onClose}>×</button>
         </div>
       </div>
-      <div className="cmux-panel-body cmux-split-body" style={{ maxHeight: 380 }}>
+      <div className="cmux-panel-body cmux-split-body cmux-wide-split-body" style={{ maxHeight: 380 }}>
         <div className="cmux-list">
           {items.length === 0 && <div className="cmux-empty">No templates saved</div>}
           {items.map((t) => (
