@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type AgentMessage, type AgentThread } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
 import { useAppDialog } from "./AppDialog";
+import { XIcon } from "./icons";
 
 interface Msg {
   id: string;
@@ -25,11 +26,13 @@ interface ProviderOption {
 }
 
 interface Props {
+  workspaceId?: string;
+  surfaceId?: string;
   paneId?: string;
   onClose: () => void;
 }
 
-export function AgentChatPanel({ paneId }: Props) {
+export function AgentChatPanel({ workspaceId, surfaceId, paneId, onClose }: Props) {
   const dialog = useAppDialog();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -45,8 +48,7 @@ export function AgentChatPanel({ paneId }: Props) {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const threadRef = useRef<string | undefined>(undefined);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const providerWrapRef = useRef<HTMLDivElement>(null);
 
   const providerOptions = useMemo(() => buildProviderOptions(agentSettings), [agentSettings]);
   const activeProvider = useMemo(() => {
@@ -69,16 +71,21 @@ export function AgentChatPanel({ paneId }: Props) {
     }
   }, []);
 
-  const refreshThreads = useCallback(async (preferredThreadId?: string) => {
+  const refreshThreads = useCallback(async (preferredThreadId?: string, loadPreferred = true) => {
     try {
-      const all = await api.getThreads();
+      let all = await api.getThreads({ workspaceId });
+      if (all.length === 0 && workspaceId) {
+        all = await api.getThreads();
+      }
       setThreads(all);
-      const preferred = preferredThreadId || threadRef.current || selectedThreadId;
+      const preferred = preferredThreadId || threadRef.current;
       const next = (preferred && all.find((t) => t.id === preferred)) || all[0];
-      if (next && next.id !== threadRef.current) {
+      if (next) {
+        const currentThreadId = threadRef.current;
+        const shouldLoad = loadPreferred && next.id !== currentThreadId;
         threadRef.current = next.id;
         setSelectedThreadId(next.id);
-        await loadThreadMessages(next.id);
+        if (shouldLoad) await loadThreadMessages(next.id);
       } else if (!next) {
         threadRef.current = undefined;
         setSelectedThreadId(null);
@@ -86,7 +93,7 @@ export function AgentChatPanel({ paneId }: Props) {
         setUsage("Usage: -");
       }
     } catch { /* ignore */ }
-  }, [loadThreadMessages, selectedThreadId]);
+  }, [loadThreadMessages, workspaceId]);
 
   useEffect(() => {
     api.getAgentSettings().then(setAgentSettings).catch(() => {});
@@ -94,35 +101,54 @@ export function AgentChatPanel({ paneId }: Props) {
   }, [refreshThreads]);
 
   useEffect(() => {
+    const reloadAgentSettings = () => {
+      api.getAgentSettings().then(setAgentSettings).catch(() => {});
+    };
+    window.addEventListener("wimux-agent-settings-changed", reloadAgentSettings);
+    return () => window.removeEventListener("wimux-agent-settings-changed", reloadAgentSettings);
+  }, []);
+
+  useEffect(() => {
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${proto}://${location.host}/ws/agent`);
     ws.onmessage = (e) => {
       try {
         const u = JSON.parse(e.data);
-        if (paneId && u.paneId && u.paneId !== paneId) return;
-        if (u.type === "ThreadChanged") {
+        if (workspaceId && u.workspaceId && u.workspaceId !== workspaceId) return;
+        if (surfaceId && u.surfaceId && u.surfaceId !== surfaceId) return;
+        const type = updateTypeName(u.type);
+        if (type === "ThreadChanged") {
           threadRef.current = u.threadId;
           setSelectedThreadId(u.threadId);
+          setThreadSearch("");
+          setUsage("Usage: -");
           setStatus("Thread selected");
-        } else if (u.type === "UserMessage") {
+          void refreshThreads(u.threadId, false);
+        } else if (type === "UserMessage") {
+          if (threadRef.current !== u.threadId) return;
           appendMessage({ id: u.messageId || crypto.randomUUID(), threadId: u.threadId, role: "user", content: u.message, createdAtUtc: u.createdAtUtc });
           setStatus("User message sent");
-        } else if (u.type === "AssistantDelta") {
+        } else if (type === "AssistantDelta") {
+          if (threadRef.current !== u.threadId) return;
           setBusy(true);
           setStatus("Streaming response...");
           setMessages((m) => upsertStreamingMessage(m, u.threadId, u.messageId, u.message));
-        } else if (u.type === "AssistantCompleted") {
+        } else if (type === "AssistantCompleted") {
+          if (threadRef.current !== u.threadId) return;
           setBusy(false);
           finalizeAssistant(u);
           setUsage(`Usage: in ${u.inputTokens ?? 0} · out ${u.outputTokens ?? 0} · total ${u.totalTokens ?? 0}`);
           updateContextLabel(u);
           setStatus("Response completed");
-          void refreshThreads(u.threadId);
-        } else if (u.type === "ContextMetrics") {
+          void refreshThreads(u.threadId, false);
+        } else if (type === "ContextMetrics") {
+          if (threadRef.current && u.threadId && threadRef.current !== u.threadId) return;
           updateContextLabel(u);
-        } else if (u.type === "Status") {
+        } else if (type === "Status") {
+          if (threadRef.current && u.threadId && threadRef.current !== u.threadId) return;
           setStatus(u.message || "Idle");
-        } else if (u.type === "Error") {
+        } else if (type === "Error") {
+          if (threadRef.current !== u.threadId) return;
           setBusy(false);
           appendMessage({ id: u.messageId || crypto.randomUUID(), threadId: u.threadId, role: "error", content: u.message, createdAtUtc: u.createdAtUtc });
           setStatus("Error: " + u.message);
@@ -130,13 +156,35 @@ export function AgentChatPanel({ paneId }: Props) {
       } catch { /* ignore */ }
     };
     return () => ws.close();
-  }, [paneId, refreshThreads]);
+  }, [loadThreadMessages, refreshThreads, surfaceId, workspaceId]);
 
   useEffect(() => { bodyRef.current?.scrollTo(0, bodyRef.current.scrollHeight); }, [messages, messageSearch]);
+
+  useEffect(() => {
+    if (!providerMenu) return;
+    const closeOnOutsidePointer = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (target && providerWrapRef.current?.contains(target)) return;
+      setProviderMenu(false);
+    };
+    const closeOnEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setProviderMenu(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [providerMenu]);
 
   const appendMessage = (msg: Msg) => {
     setMessages((m) => {
       if (msg.id && m.some((x) => x.id === msg.id)) return m;
+      if (msg.role === "user") {
+        const idx = m.findIndex((x) => x.id.startsWith("optimistic-user-") && x.threadId === msg.threadId && x.content === msg.content);
+        if (idx >= 0) return [...m.slice(0, idx), msg, ...m.slice(idx + 1)];
+      }
       return [...m, msg];
     });
   };
@@ -220,6 +268,7 @@ export function AgentChatPanel({ paneId }: Props) {
     setSelectedThreadId(thread.id);
     threadRef.current = thread.id;
     setStatus("Thread selected");
+    api.activateThread(thread.id, { workspaceId, surfaceId, paneId }).catch(() => {});
     await loadThreadMessages(thread.id);
   };
 
@@ -233,9 +282,49 @@ export function AgentChatPanel({ paneId }: Props) {
     if (!paneId) { setStatus("No active pane selected"); return; }
 
     setInput("");
-    const r = await api.sendAgentPrompt(paneId, prompt, threadRef.current);
-    if (!r.ok) setStatus(r.error || "Agent did not accept the prompt");
-    else if (r.threadId) threadRef.current = r.threadId;
+    let threadId = threadRef.current;
+    if (!threadId) {
+      try {
+        const thread = await api.createThread(paneId);
+        threadId = thread.id;
+        threadRef.current = thread.id;
+        setSelectedThreadId(thread.id);
+        setThreadSearch("");
+        setMessages([]);
+        setUsage("Usage: -");
+        await refreshThreads(thread.id, false);
+      } catch {
+        setStatus("Failed to create thread");
+        return;
+      }
+    }
+
+    const now = new Date().toISOString();
+    appendMessage({ id: `optimistic-user-${threadId}-${Date.now()}`, threadId, role: "user", content: prompt, createdAtUtc: now });
+    setMessages((m) => upsertStreamingMessage(m, threadId!, undefined, "..."));
+    setBusy(true);
+    setStatus("Waiting for response...");
+
+    let r: { ok: boolean; threadId?: string; error?: string };
+    try {
+      r = await api.sendAgentPrompt(paneId, prompt, threadId);
+    } catch {
+      setBusy(false);
+      setStatus("Failed to send prompt");
+      setMessages((m) => m.filter((x) => x.id !== `stream-${threadId}`));
+      return;
+    }
+
+    if (!r.ok) {
+      setBusy(false);
+      setStatus(r.error || "Agent did not accept the prompt");
+      setMessages((m) => m.filter((x) => x.id !== `stream-${threadId}`));
+    } else if (r.threadId && r.threadId !== threadRef.current) {
+      threadRef.current = r.threadId;
+      setSelectedThreadId(r.threadId);
+      setThreadSearch("");
+      await refreshThreads(r.threadId, false);
+    }
   };
 
   const chooseProvider = async (option: ProviderOption) => {
@@ -249,27 +338,32 @@ export function AgentChatPanel({ paneId }: Props) {
     setProviderMenu(false);
     try {
       await api.saveAgentSettings(next);
+      window.dispatchEvent(new CustomEvent("wimux-agent-settings-changed", { detail: next }));
       setStatus(`Provider: ${option.label}`);
     } catch {
       setStatus("Failed to save provider");
     }
   };
 
-  const attachImage = () => imageInputRef.current?.click();
-  const attachFile = () => fileInputRef.current?.click();
-
-  const onImageChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setInput((prev) => appendPath(prev, file.name));
-    e.target.value = "";
+  const toggleProviderMenu = async () => {
+    if (providerMenu) {
+      setProviderMenu(false);
+      return;
+    }
+    try {
+      setAgentSettings(await api.getAgentSettings());
+    } catch { /* use current settings */ }
+    setProviderMenu(true);
   };
 
-  const onFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setInput((prev) => appendPath(prev, file.name));
-    e.target.value = "";
+  const attachImage = async () => {
+    const picked = await api.chooseFile().catch(() => undefined);
+    if (picked?.path) setInput((prev) => appendPath(prev, picked.path));
+  };
+
+  const attachFile = async () => {
+    const picked = await api.chooseFile().catch(() => undefined);
+    if (picked?.path) setInput((prev) => appendPath(prev, picked.path));
   };
 
   const filteredThreads = threadSearch
@@ -280,42 +374,52 @@ export function AgentChatPanel({ paneId }: Props) {
     : messages;
 
   return (
-    <div className="cmux-panel cmux-agent-chat">
-      <div className="cmux-chat-threadbar">
-        <SearchIcon className="cmux-search-icon" />
+    <div
+      className="wimux-panel wimux-agent-chat"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          onClose();
+        }
+      }}
+    >
+      <div className="wimux-chat-threadbar">
+        <SearchIcon className="wimux-search-icon" />
         <input
-          className="cmux-chat-search"
+          className="wimux-chat-search"
           value={threadSearch}
           onChange={(e) => setThreadSearch(e.target.value)}
           title="Search threads"
         />
-        <button className="cmux-icon-btn" onClick={newThread} title="New thread"><PlusIcon /></button>
-        <button className="cmux-icon-btn" onClick={deleteThread} title="Delete selected thread"><TrashIcon /></button>
-        <button className="cmux-icon-btn" onClick={() => refreshThreads()} title="Refresh threads"><RefreshIcon /></button>
+        <button className="wimux-icon-btn" onClick={newThread} title="New thread"><PlusIcon /></button>
+        <button className="wimux-icon-btn" onClick={deleteThread} title="Delete selected thread"><TrashIcon /></button>
+        <button className="wimux-icon-btn" onClick={() => refreshThreads()} title="Refresh threads"><RefreshIcon /></button>
+        <button className="wimux-icon-btn" onClick={onClose} title="Close"><XIcon /></button>
       </div>
 
-      <div className="cmux-chat-threads">
+      <div className="wimux-chat-threads">
         {filteredThreads.map((t) => (
           <button
             key={t.id}
             type="button"
-            className={"cmux-thread-item" + (t.id === selectedThreadId ? " active" : "")}
+            className={"wimux-thread-item" + (t.id === selectedThreadId ? " active" : "")}
             onClick={() => selectThread(t)}
           >
-            <span className="cmux-thread-title">{t.title}</span>
-            <span className="cmux-thread-meta dim">{formatThreadMeta(t)}</span>
+            <span className="wimux-thread-title">{t.title}</span>
+            <span className="wimux-thread-meta dim">{formatThreadMeta(t)}</span>
           </button>
         ))}
       </div>
 
-      <div className="cmux-chat-info">
+      <div className="wimux-chat-info">
         <div>{busy ? "Streaming response..." : status}</div>
         <div>{usage}</div>
         <div>{context}</div>
-        <div className="cmux-message-search-row">
-          <SearchIcon className="cmux-search-icon" />
+        <div className="wimux-message-search-row">
+          <SearchIcon className="wimux-search-icon" />
           <input
-            className="cmux-chat-search"
+            className="wimux-chat-search"
             value={messageSearch}
             onChange={(e) => setMessageSearch(e.target.value)}
             title="Search within selected thread"
@@ -323,54 +427,52 @@ export function AgentChatPanel({ paneId }: Props) {
         </div>
       </div>
 
-      <div className="cmux-chat-body" ref={bodyRef}>
-        {!paneId && <div className="cmux-empty">Focus a pane to chat</div>}
+      <div className="wimux-chat-body" ref={bodyRef}>
+        {!paneId && <div className="wimux-empty">Focus a pane to chat</div>}
         {visibleMessages.map((m) => (
-          <div key={m.id} className={"cmux-chat-msg " + m.role}>
-            <div className="cmux-chat-msg-main">
-              <div className="cmux-chat-role">{messageHeader(m)}</div>
-              <div className="cmux-chat-content md" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} />
-              <div className="cmux-chat-meta dim mono">{messageMeta(m)}</div>
+          <div key={m.id} className={"wimux-chat-msg " + m.role}>
+            <div className="wimux-chat-msg-main">
+              <div className="wimux-chat-role">{messageHeader(m)}</div>
+              <div className="wimux-chat-content md" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} />
+              <div className="wimux-chat-meta dim mono">{messageMeta(m)}</div>
             </div>
-            <button className="cmux-icon-btn cmux-chat-delete" onClick={() => deleteMessage(m)} title="Delete this message"><TrashIcon /></button>
+            <button className="wimux-icon-btn wimux-chat-delete" onClick={() => deleteMessage(m)} title="Delete this message"><TrashIcon /></button>
           </div>
         ))}
       </div>
 
-      <div className="cmux-agent-input-wrap">
+      <div className="wimux-agent-input-wrap">
         <textarea
-          className="cmux-agent-textarea"
+          className="wimux-agent-textarea"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
         />
-        <div className="cmux-agent-input-bar">
-          <div style={{ position: "relative", minWidth: 0 }}>
-            <button className="cmux-provider-btn" onClick={() => setProviderMenu((v) => !v)}>
-              <span className="cmux-provider-dot" />
-              <span className="cmux-provider-current">{activeProvider ? `${activeProvider.label} · ${shortModel(activeProvider.model)}` : "Agent"}</span>
-              <ChevronDownIcon className="cmux-provider-caret" />
+        <div className="wimux-agent-input-bar">
+          <div ref={providerWrapRef} style={{ position: "relative", minWidth: 0 }}>
+            <button className="wimux-provider-btn" onClick={toggleProviderMenu}>
+              <span className="wimux-provider-dot" />
+              <span className="wimux-provider-current">{activeProvider ? `${activeProvider.label} · ${shortModel(activeProvider.model)}` : "Agent"}</span>
+              <ChevronDownIcon className="wimux-provider-caret" />
             </button>
             {providerMenu && (
-              <div className="cmux-provider-menu">
+              <div className="wimux-provider-menu">
                 {providerOptions.map((p) => (
-                  <button key={p.key} className="cmux-provider-item" onClick={() => chooseProvider(p)}>
-                    <span className="cmux-provider-dot" />
-                    <span className="cmux-provider-name">{p.label}</span>
-                    <span className="cmux-provider-model dim mono">{shortModel(p.model)}</span>
+                  <button key={p.key} className="wimux-provider-item" onClick={() => chooseProvider(p)}>
+                    <span className="wimux-provider-dot" />
+                    <span className="wimux-provider-name">{p.label}</span>
+                    <span className="wimux-provider-model dim mono">{shortModel(p.model)}</span>
                   </button>
                 ))}
               </div>
             )}
           </div>
-          <div className="cmux-agent-actions">
-            <button className="cmux-icon-btn" onClick={attachImage} title="Attach image"><ImageIcon /></button>
-            <button className="cmux-icon-btn" onClick={attachFile} title="Attach file"><FileIcon /></button>
-            <button className="cmux-agent-send" onClick={send} disabled={!paneId || busy} title="Send (Enter)"><ArrowUpIcon /></button>
+          <div className="wimux-agent-actions">
+            <button className="wimux-icon-btn" onClick={attachImage} title="Attach image"><ImageIcon /></button>
+            <button className="wimux-icon-btn" onClick={attachFile} title="Attach file"><FileIcon /></button>
+            <button className="wimux-agent-send" onClick={send} disabled={!paneId || busy} title="Send (Enter)"><ArrowUpIcon /></button>
           </div>
         </div>
-        <input ref={imageInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onImageChosen} />
-        <input ref={fileInputRef} type="file" style={{ display: "none" }} onChange={onFileChosen} />
       </div>
     </div>
   );
@@ -397,12 +499,29 @@ function upsertStreamingMessage(messages: Msg[], threadId: string, messageId: st
   const idx = messages.findIndex((m) => m.id === id || (m.id === `stream-${threadId}` && m.role === "assistant"));
   if (idx < 0) return [...messages, { id, threadId, role: "assistant", content: delta || "" }];
   const current = messages[idx];
-  return [...messages.slice(0, idx), { ...current, id, content: current.content + (delta || "") }, ...messages.slice(idx + 1)];
+  const content = current.content === "..." ? (delta || "") : current.content + (delta || "");
+  return [...messages.slice(0, idx), { ...current, id, content }, ...messages.slice(idx + 1)];
+}
+
+function updateTypeName(type: unknown) {
+  if (typeof type === "string") return type;
+  if (typeof type === "number") {
+    return [
+      "ThreadChanged",
+      "UserMessage",
+      "AssistantDelta",
+      "AssistantCompleted",
+      "Status",
+      "Error",
+      "ContextMetrics",
+    ][type] ?? "";
+  }
+  return "";
 }
 
 function buildProviderOptions(settings: any): ProviderOption[] {
   const opts: ProviderOption[] = [
-    { key: "openai", provider: "openai", label: "Openai", model: settings?.openAi?.model ?? "gpt-4o-mini" },
+    { key: "openai", provider: "openai", label: "OpenAI", model: settings?.openAi?.model ?? "gpt-4o-mini" },
     { key: "anthropic", provider: "anthropic", label: "Anthropic", model: settings?.anthropic?.model ?? "claude-3-5-sonnet-latest" },
     { key: "gemini", provider: "gemini", label: "Gemini", model: settings?.gemini?.model ?? "gemini-2.0-flash" },
   ];

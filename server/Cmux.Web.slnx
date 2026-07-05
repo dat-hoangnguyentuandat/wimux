@@ -1,7 +1,0 @@
-<Solution>
-  <Project Path="Cmux.Core/Cmux.Core.csproj" />
-  <Project Path="Cmux.Tests/Cmux.Tests.csproj" />
-  <Project Path="Cmux.Web/Cmux.Web.csproj" />
-  <Project Path="Cmux.Cli/Cmux.Cli.csproj" />
-  <Project Path="Cmux.Launcher/Cmux.Launcher.csproj" />
-</Solution>

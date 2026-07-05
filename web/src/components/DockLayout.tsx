@@ -15,7 +15,7 @@ import type { AppState, SplitNode, Surface, TerminalTheme, Workspace } from "../
 import { BellIcon, PlusIcon, XIcon } from "./icons";
 
 export type PanelId = "sidebar" | "agentChat" | "logs" | "vault" | "quota" | "agents" | "wsSettings";
-export const DOCK_LAYOUT_STORAGE_KEY = "cmux3.dockLayout.v4";
+export const DOCK_LAYOUT_STORAGE_KEY = "wimux.dockLayout.v4";
 
 export const DOCK_PANELS: { id: PanelId; label: string }[] = [
   { id: "sidebar", label: "Workspaces" },
@@ -100,9 +100,9 @@ function TerminalContent() {
       const header = group.querySelector(':scope > .dv-tabs-and-actions-container') as HTMLElement | null;
       if (!header) { if (++attempts < MAX) setTimeout(tryFind, 50); return; }
       let slot = header.firstElementChild as HTMLElement | null;
-      if (!slot || !slot.classList.contains('cmux-surface-slot')) {
+      if (!slot || !slot.classList.contains('wimux-surface-slot')) {
         slot = document.createElement('div');
-        slot.className = 'cmux-surface-slot';
+        slot.className = 'wimux-surface-slot';
         slot.style.cssText = 'display:flex;align-items:center;gap:2px;flex-shrink:1;overflow:hidden;';
         header.insertBefore(slot, header.firstChild);
       }
@@ -236,11 +236,11 @@ function TerminalStatusBar() {
 function panelBody(id: PanelId, d: DockCtx, close: () => void) {
   switch (id) {
     case "sidebar": return <WorkspacesContent />;
-    case "agentChat": return <AgentChatPanel paneId={d.focusedPaneId} onClose={close} />;
+    case "agentChat": return <AgentChatPanel workspaceId={d.workspace?.id} surfaceId={d.surface?.id} paneId={d.focusedPaneId} onClose={close} />;
     case "logs": return <CommandLogsPanel workspace={d.workspace} onClose={close} onInsert={d.insertIntoFocused} onOpenVault={() => d.openPanel("vault")} />;
     case "vault": return <SessionVaultPanel workspace={d.workspace} onClose={close} />;
     case "quota": return <QuotaPanel onClose={close} />;
-    case "agents": return <AgentsPanel onClose={close} onSend={d.insertIntoFocused} />;
+    case "agents": return <AgentsPanel onClose={close} />;
     case "wsSettings": return d.workspace ? <WorkspaceSettingsPanel workspace={d.workspace} onClose={close} /> : null;
   }
 }
@@ -890,7 +890,7 @@ export function DockLayout({ openPanels, uiTheme, ...ctx }: Props) {
 
   return (
     <Ctx.Provider value={{ ...ctx, focusDockPanel, dockApi: dockApi ?? undefined, headerPortalTarget, setHeaderPortalTarget }}>
-      <div className="cmux-layout">
+      <div className="wimux-layout">
         <DockviewReact
           className={`dv-dock ${uiTheme}`}
           components={COMPONENTS}

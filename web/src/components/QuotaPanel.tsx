@@ -26,25 +26,25 @@ export function QuotaPanel({ onClose }: { onClose: () => void }) {
   }), { requests: 0, input: 0, output: 0, total: 0 }) ?? { requests: 0, input: 0, output: 0, total: 0 };
 
   return (
-    <div className="cmux-panel cmux-wide-data-panel cmux-quota-panel">
-      <div className="cmux-panel-toolbar">
-        <div className="cmux-panel-toolbar-row">
+    <div className="wimux-panel wimux-wide-data-panel wimux-quota-panel">
+      <div className="wimux-panel-toolbar">
+        <div className="wimux-panel-toolbar-row">
           <label>Window</label>
           <select value={window} onChange={(e) => setWindow(e.target.value)}>
             {windows.map((w) => <option key={w} value={w}>{WINDOW_LABELS[w] ?? w}</option>)}
           </select>
-          <button className="cmux-btn" onClick={load}>Refresh</button>
-          <span className="cmux-spacer" />
+          <button className="wimux-btn" onClick={load}>Refresh</button>
+          <span className="wimux-spacer" />
         </div>
       </div>
-      <div className="cmux-panel-body cmux-quota-body cmux-wide-data-body">
-        <div className="cmux-quota-summary">
-          <div><div className="cmux-stat-label">Requests</div><div className="cmux-stat">{totals.requests.toLocaleString()}</div></div>
-          <div><div className="cmux-stat-label">Input Tokens</div><div className="cmux-stat">{totals.input.toLocaleString()}</div></div>
-          <div><div className="cmux-stat-label">Output Tokens</div><div className="cmux-stat">{totals.output.toLocaleString()}</div></div>
-          <div><div className="cmux-stat-label">Total Tokens</div><div className="cmux-stat accent">{totals.total.toLocaleString()}</div></div>
+      <div className="wimux-panel-body wimux-quota-body wimux-wide-data-body">
+        <div className="wimux-quota-summary">
+          <div><div className="wimux-stat-label">Requests</div><div className="wimux-stat">{totals.requests.toLocaleString()}</div></div>
+          <div><div className="wimux-stat-label">Input Tokens</div><div className="wimux-stat">{totals.input.toLocaleString()}</div></div>
+          <div><div className="wimux-stat-label">Output Tokens</div><div className="wimux-stat">{totals.output.toLocaleString()}</div></div>
+          <div><div className="wimux-stat-label">Total Tokens</div><div className="wimux-stat accent">{totals.total.toLocaleString()}</div></div>
         </div>
-        <table className="cmux-grid">
+        <table className="wimux-grid">
           <thead>
             <tr>
               <th style={{ width: 140 }}>Provider</th>
@@ -68,13 +68,13 @@ export function QuotaPanel({ onClose }: { onClose: () => void }) {
                 <td className="dim">{r.lastActivityLocal}</td>
               </tr>
             ))}
-            {(!data || data.rows.length === 0) && <tr><td colSpan={7} className="cmux-empty">No agent activity</td></tr>}
+            {(!data || data.rows.length === 0) && <tr><td colSpan={7} className="wimux-empty">No agent activity</td></tr>}
           </tbody>
         </table>
       </div>
-      <div className="cmux-panel-footer">
+      <div className="wimux-panel-footer">
         <span className="dim">{snap ? `Generated ${new Date(snap.generatedAtUtc).toLocaleString()}` : "Loading…"}</span>
-        <span className="cmux-spacer" />
+        <span className="wimux-spacer" />
       </div>
     </div>
   );

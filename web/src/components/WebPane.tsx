@@ -29,7 +29,7 @@ interface BrowserTab {
 
 const HOME_URL = "https://www.google.com/webhp?igu=1";
 const SEARCH_URL = "https://www.google.com/search?igu=1&q=";
-const YOUTUBE_HOME = "cmux://youtube";
+const YOUTUBE_HOME = "wimux://youtube";
 const DIRECT_HOSTS = new Set([
   "www.youtube-nocookie.com",
   "youtube-nocookie.com",
@@ -106,7 +106,7 @@ function normalizeUrl(value: string) {
   let target = value.trim();
   if (!target) return "";
   if (target.startsWith("/api/frame-proxy?")) return target;
-  if (target.startsWith("cmux://")) return target;
+  if (target.startsWith("wimux://")) return target;
   if (!/^https?:\/\//i.test(target)) {
     const hostPart = target.split(/[/?#]/, 1)[0] ?? "";
     const looksLikeAddress =

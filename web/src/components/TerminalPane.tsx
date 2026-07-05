@@ -169,7 +169,7 @@ export function TerminalPane(props: Props) {
   // True while the running TUI has DEC mouse tracking (1000/1002/1003) on.
   // Mirrors `TerminalBuffer.MouseEnabled` on the server; the server pushes a
   // `mouseTracking` event whenever it changes. Used to decide whether plain
-  // right-click should open cmux's context menu: TUI apps swallow the click
+  // right-click should open wimux's context menu: TUI apps swallow the click
   // so we must intercept; pwsh/cmd don't track so the browser default is
   // fine and we only force the menu on Shift+Right.
   const [mouseTracking, setMouseTracking] = useState(false);
@@ -183,7 +183,7 @@ export function TerminalPane(props: Props) {
   const lastTypeablePointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
 
   // Default to the legacy behaviour (TUI apps keep their own right-click =
-  // paste; Shift+Right opens cmux's menu). Only opt into "always menu" when the
+  // paste; Shift+Right opens wimux's menu). Only opt into "always menu" when the
   // setting is explicitly true. Missing/undefined (older settings.json or
   // before settings have loaded) keeps the legacy default.
   useEffect(() => {
@@ -390,7 +390,7 @@ export function TerminalPane(props: Props) {
     // composer — raw keystroke interception fights the OS IME and produces
     // the wrong bytes for xterm's composition surface. The OS TSF IME
     // already emits the right "\b<composed>" sequence, and the server's
-    // ConPTY forwards it verbatim. This matches the cmux2 (WPF) behavior
+    // ConPTY forwards it verbatim. This matches the wimux2 (WPF) behavior
     // of trusting the host's text input.
     term.onData((data) => { sendTerminalInput(data); });
 
@@ -414,7 +414,7 @@ export function TerminalPane(props: Props) {
     // xterm.js installs its own capture-phase mousedown / contextmenu handlers
     // on `term.element` and calls `preventDefault()` + `stopPropagation()` in
     // tracking mode. So plain `addEventListener` on the wrapper div is too
-    // late — those bubbles never reach it. We mirror cmux2's
+    // late — those bubbles never reach it. We mirror wimux2's
     // `OnMouseRightButtonDown` flow by attaching on the *xterm* element with
     // `{ capture: true }`, so we run before xterm can suppress the event.
     const xtermEl = term.element ?? containerRef.current!;
@@ -425,10 +425,10 @@ export function TerminalPane(props: Props) {
     //      (1) is the only one that runs. In pwsh mode xterm forwards the
     //      event unchanged, so path (2) is what actually runs.
     // Default (RightClickAlwaysMenu = false, legacy): in plain shells a plain
-    // right-click opens cmux's context menu; inside a mouse-tracking TUI the
+    // right-click opens wimux's context menu; inside a mouse-tracking TUI the
     // plain right-click is forwarded to the TUI (its own "paste") and only
-    // Shift+Right opens cmux's menu. When RightClickAlwaysMenu = true, a plain
-    // right-click opens cmux's menu everywhere — we intercept the click in the
+    // Shift+Right opens wimux's menu. When RightClickAlwaysMenu = true, a plain
+    // right-click opens wimux's menu everywhere — we intercept the click in the
     // capture phase (before xterm can forward it to the TUI) via
     // preventDefault() + stopPropagation().
     const openMenu = (e: MouseEvent) => {
@@ -439,9 +439,9 @@ export function TerminalPane(props: Props) {
       setMenu({ x: e.clientX, y: e.clientY });
     };
     const onRightMouseDown = (e: MouseEvent) => {
-      if (e.button !== 2) return; // cmux2 only handles right-button down
+      if (e.button !== 2) return; // wimux2 only handles right-button down
       // Legacy mode: let the TUI handle a plain right-click while it is
-      // tracking the mouse; only Shift+Right forces cmux's menu.
+      // tracking the mouse; only Shift+Right forces wimux's menu.
       if (!rightClickAlwaysMenuRef.current && mouseTrackingRef.current && !e.shiftKey) return;
       openMenu(e);
     };

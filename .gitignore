@@ -1,7 +1,7 @@
 # Build output
 server/**/bin/
 server/**/obj/
-server/Cmux.Web/wwwroot/
+server/Wimux.Web/wwwroot/
 dist/
 
 # Node

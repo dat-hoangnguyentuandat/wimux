@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Wimux.Core/Wimux.Core.csproj" />
+  <Project Path="Wimux.Tests/Wimux.Tests.csproj" />
+  <Project Path="Wimux.Web/Wimux.Web.csproj" />
+  <Project Path="Wimux.Cli/Wimux.Cli.csproj" />
+  <Project Path="Wimux.Launcher/Wimux.Launcher.csproj" />
+</Solution>

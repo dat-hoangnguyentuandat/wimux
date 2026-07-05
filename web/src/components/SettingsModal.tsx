@@ -10,7 +10,7 @@ interface Props {
 
 type Tab = "appearance" | "terminal" | "behavior" | "keyboard" | "agent" | "about";
 
-// Monochrome SVG icons matching cmux2 Segoe MDL2 style
+// Monochrome SVG icons matching wimux2 Segoe MDL2 style
 const IconAppearance = () => (<svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2" fill="none"/><circle cx="8" cy="8" r="2.5" fill="currentColor" opacity="0.4"/></svg>);
 const IconTerminal = () => (<svg width="14" height="14" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/><text x="5" y="11" fill="currentColor" fontSize="7" fontWeight="bold">{">_"}</text></svg>);
 const IconBehavior = () => (<svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2" fill="none"/><path d="M8 3v2.5M8 10.5v2.5M3 8h2.5m5 0H13" stroke="currentColor" strokeWidth="1.2"/></svg>);
@@ -120,9 +120,17 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
 
 // ── Custom provider editor ──
 
-function CustomProvidersEditor({ providers, onChange }: { providers: any[]; onChange: (p: any[]) => void }) {
+function CustomProvidersEditor({ providers, onChange, secretValues, onSecretChange, onSecretClear, isSecretCleared }: {
+  providers: any[];
+  onChange: (p: any[]) => void;
+  secretValues: Record<string, string>;
+  onSecretChange: (name: string, value: string) => void;
+  onSecretClear: (name: string) => void;
+  isSecretCleared: (name: string) => boolean;
+}) {
   const [selected, setSelected] = useState(0);
   const p = providers[selected] || { name: "", kind: "anthropic", baseUrl: "", model: "", apiKeySecretName: "", authScheme: "bearer" };
+  const defaultSecretName = p.apiKeySecretName || (p.name ? `agent.custom.${sanitizeSecretSegment(p.name)}.apiKey` : "");
 
   const update = (patch: any) => {
     const next = [...providers];
@@ -155,7 +163,12 @@ function CustomProvidersEditor({ providers, onChange }: { providers: any[]; onCh
       <Row label="Base URL"><Txt value={p.baseUrl || ""} onChange={(v) => update({ baseUrl: v })} style={{ width: "100%" }} /></Row>
       <Row label="Model"><Txt value={p.model || ""} onChange={(v) => update({ model: v })} style={{ width: "100%" }} /></Row>
       <Row label="Auth Scheme"><Sel value={p.authScheme || "bearer"} onChange={(v) => update({ authScheme: v })} opts={["bearer", "x-api-key"]} style={{ width: 160 }} /></Row>
-      <Row label="API Key"><Txt value={p.apiKeySecretName || ""} onChange={(v) => update({ apiKeySecretName: v })} style={{ width: "100%" }} /></Row>
+      <Row label="API Key">
+        <div className="set-horiz" style={{ width: "100%" }}>
+          <Txt password placeholder={isSecretCleared(defaultSecretName) ? "(cleared on save)" : "(unchanged)"} value={defaultSecretName ? (secretValues[defaultSecretName] ?? "") : ""} onChange={(v) => onSecretChange(defaultSecretName, v)} style={{ flex: 1 }} />
+          <button className="set-btn" onClick={() => onSecretClear(defaultSecretName)} disabled={!defaultSecretName}>Clear</button>
+        </div>
+      </Row>
       <div className="set-horiz" style={{ marginTop: 8 }}>
         <button className="set-btn" onClick={add}>Add</button>
         <button className="set-btn" onClick={remove} disabled={providers.length === 0}>Remove</button>
@@ -266,12 +279,26 @@ function McpServersEditor({ servers, onChange }: { servers: any[]; onChange: (s:
 export function SettingsModal({ themes, onClose, onApplied }: Props) {
   const dialog = useAppDialog();
   const [settings, setSettings] = useState<any>(null);
+  const [agentSecretValues, setAgentSecretValues] = useState<Record<string, string>>({});
+  const [agentSecretsToClear, setAgentSecretsToClear] = useState<Set<string>>(new Set());
+  const [customToolsJson, setCustomToolsJson] = useState("[]");
+  const [mcpServersJson, setMcpServersJson] = useState("[]");
+  const [submitProfilesJson, setSubmitProfilesJson] = useState("[]");
   const [shells, setShells] = useState<{ name: string; path: string }[]>([]);
   const [tab, setTab] = useState<Tab>("appearance");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  function syncAgentJsonDrafts(agent: any) {
+    setCustomToolsJson(JSON.stringify(agent.customTools || [], null, 2));
+    setMcpServersJson(JSON.stringify(agent.mcpServers || [], null, 2));
+    setSubmitProfilesJson(JSON.stringify(agent.submitProfiles || [], null, 2));
+  }
+
   useEffect(() => {
-    api.getSettings().then(setSettings);
+    api.getSettings().then((saved) => {
+      setSettings(saved);
+      syncAgentJsonDrafts(saved.agent || {});
+    });
     api.getShells().then(setShells).catch(() => setShells([]));
   }, []);
 
@@ -282,9 +309,60 @@ export function SettingsModal({ themes, onClose, onApplied }: Props) {
   const theme = themes.find((t) => t.name === s.themeName);
   const ag = s.agent || {};
   const setAgent = (patch: any) => set({ agent: { ...ag, ...patch } });
+  const setAgentSecretValue = (name: string, value: string) => {
+    if (!name) return;
+    setAgentSecretValues((prev) => ({ ...prev, [name]: value }));
+    setAgentSecretsToClear((prev) => {
+      const next = new Set(prev);
+      next.delete(name);
+      return next;
+    });
+  };
+  const getAgentSecretValue = (name: string) => name ? agentSecretValues[name] ?? "" : "";
+  const clearAgentSecret = (name: string) => {
+    if (!name) return;
+    setAgentSecretValues((prev) => ({ ...prev, [name]: "" }));
+    setAgentSecretsToClear((prev) => new Set(prev).add(name));
+  };
+  const isAgentSecretCleared = (name: string) => !!name && agentSecretsToClear.has(name);
+  const renderSecretInput = (name: string) => (
+    <div className="set-horiz" style={{ width: "100%" }}>
+      <Txt
+        password
+        placeholder={isAgentSecretCleared(name) ? "(cleared on save)" : "(unchanged)"}
+        value={getAgentSecretValue(name)}
+        onChange={(v) => setAgentSecretValue(name, v)}
+        style={{ flex: 1 }}
+      />
+      <button className="set-btn" onClick={() => clearAgentSecret(name)}>Clear</button>
+    </div>
+  );
 
   const save = async () => {
-    const updated = await api.saveSettings(settings);
+    const draft = buildSettingsWithJsonDrafts(settings, {
+      customToolsJson,
+      mcpServersJson,
+      submitProfilesJson,
+    });
+    if (draft.error) {
+      await dialog.alert("Settings", draft.error);
+      return;
+    }
+    const normalized = normalizeAgentSettingsForSave(draft.settings);
+    const validationError = validateAgentSettings(normalized.agent || {});
+    if (validationError) {
+      await dialog.alert("Settings", validationError);
+      return;
+    }
+    const pendingSecrets = Object.entries(agentSecretValues).filter(([, value]) => value.trim());
+    const updated = await api.saveSettings(normalized);
+    for (const name of agentSecretsToClear) {
+      await api.clearAgentSecret(name);
+    }
+    for (const [name, value] of pendingSecrets) {
+      await api.setAgentSecret(name, value.trim());
+    }
+    window.dispatchEvent(new CustomEvent("wimux-agent-settings-changed", { detail: updated.agent }));
     onApplied(updated);
     onClose();
   };
@@ -292,14 +370,25 @@ export function SettingsModal({ themes, onClose, onApplied }: Props) {
   const reset = async () => {
     const ok = await dialog.confirm("Reset settings", "Reset all settings to defaults?", "Reset");
     if (!ok) return;
-    api.saveSettings({}).then((saved) => { setSettings(saved); onApplied(saved); });
+    api.saveSettings({}).then((saved) => {
+      setSettings(saved);
+      syncAgentJsonDrafts(saved.agent || {});
+      window.dispatchEvent(new CustomEvent("wimux-agent-settings-changed", { detail: saved.agent }));
+      onApplied(saved);
+    });
   };
 
   const importSettings = () => fileRef.current?.click();
   const onImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    file.text().then((t) => { try { setSettings({ ...settings, ...JSON.parse(t) }); } catch { /* */ } });
+    file.text().then((t) => {
+      try {
+        const imported = { ...settings, ...JSON.parse(t) };
+        setSettings(imported);
+        syncAgentJsonDrafts(imported.agent || {});
+      } catch { /* */ }
+    });
     e.target.value = "";
   };
 
@@ -307,7 +396,7 @@ export function SettingsModal({ themes, onClose, onApplied }: Props) {
     const blob = new Blob([JSON.stringify(settings, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "cmux-settings.json"; a.click();
+    a.href = url; a.download = "wimux-settings.json"; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -459,28 +548,32 @@ export function SettingsModal({ themes, onClose, onApplied }: Props) {
             <Block title="OpenAI-Compatible">
               <Row label="Base URL"><Txt value={ag.openAi?.baseUrl ?? ""} onChange={(v) => setAgent({ openAi: { ...ag.openAi, baseUrl: v } })} style={{ width: "100%" }} /></Row>
               <Row label="Model"><Txt value={ag.openAi?.model ?? ""} onChange={(v) => setAgent({ openAi: { ...ag.openAi, model: v } })} style={{ width: "100%" }} /></Row>
-              <Row label="API Key"><Txt value={ag.openAi?.apiKeySecretName ?? ""} onChange={(v) => setAgent({ openAi: { ...ag.openAi, apiKeySecretName: v } })} style={{ width: "100%" }} /></Row>
+              <Row label="API Key">{renderSecretInput(ag.openAi?.apiKeySecretName ?? "agent.openai.apiKey")}</Row>
             </Block>
 
             {/* Anthropic */}
             <Block title="Anthropic-Compatible">
               <Row label="Base URL"><Txt value={ag.anthropic?.baseUrl ?? ""} onChange={(v) => setAgent({ anthropic: { ...ag.anthropic, baseUrl: v } })} style={{ width: "100%" }} /></Row>
               <Row label="Model"><Txt value={ag.anthropic?.model ?? ""} onChange={(v) => setAgent({ anthropic: { ...ag.anthropic, model: v } })} style={{ width: "100%" }} /></Row>
-              <Row label="API Key"><Txt value={ag.anthropic?.apiKeySecretName ?? ""} onChange={(v) => setAgent({ anthropic: { ...ag.anthropic, apiKeySecretName: v } })} style={{ width: "100%" }} /></Row>
+              <Row label="API Key">{renderSecretInput(ag.anthropic?.apiKeySecretName ?? "agent.anthropic.apiKey")}</Row>
             </Block>
 
             {/* Gemini */}
             <Block title="Gemini (Google AI)">
               <Row label="Base URL"><Txt value={ag.gemini?.baseUrl ?? ""} onChange={(v) => setAgent({ gemini: { ...ag.gemini, baseUrl: v } })} style={{ width: "100%" }} /></Row>
               <Row label="Model"><Txt value={ag.gemini?.model ?? ""} onChange={(v) => setAgent({ gemini: { ...ag.gemini, model: v } })} style={{ width: "100%" }} /></Row>
-              <Row label="API Key"><Txt value={ag.gemini?.apiKeySecretName ?? ""} onChange={(v) => setAgent({ gemini: { ...ag.gemini, apiKeySecretName: v } })} style={{ width: "100%" }} /></Row>
+              <Row label="API Key">{renderSecretInput(ag.gemini?.apiKeySecretName ?? "agent.gemini.apiKey")}</Row>
             </Block>
 
             {/* Custom Providers */}
             <Block title="Custom Providers">
               <CustomProvidersEditor
                 providers={ag.customProviders || []}
-                onChange={(v) => setAgent({ customProviders: v })} />
+                onChange={(v) => setAgent({ customProviders: v })}
+                secretValues={agentSecretValues}
+                onSecretChange={setAgentSecretValue}
+                onSecretClear={clearAgentSecret}
+                isSecretCleared={isAgentSecretCleared} />
             </Block>
 
             {/* Tools */}
@@ -489,36 +582,42 @@ export function SettingsModal({ themes, onClose, onApplied }: Props) {
               <Row label="Bash Timeout (s)"><Num value={ag.bashTimeoutSeconds ?? 120} onChange={(v) => setAgent({ bashTimeoutSeconds: v })} style={{ width: 80 }} min={1} /></Row>
               <Check label="Web Search" checked={!!ag.enableWebSearchTool} onChange={(v) => setAgent({ enableWebSearchTool: v })} />
               <Row label="Exa Base URL"><Txt value={ag.exa?.baseUrl ?? ""} onChange={(v) => setAgent({ exa: { ...ag.exa, baseUrl: v } })} style={{ width: "100%" }} /></Row>
-              <Row label="Exa API Key"><Txt value={ag.exa?.apiKeySecretName ?? ""} onChange={(v) => setAgent({ exa: { ...ag.exa, apiKeySecretName: v } })} style={{ width: "100%" }} /></Row>
+              <Row label="Exa API Key">{renderSecretInput(ag.exa?.apiKeySecretName ?? "agent.exa.apiKey")}</Row>
             </Block>
 
             {/* Custom Tools */}
             <Block title="Custom Tools">
               <Row label="Mode">
-                <Sel value={ag.useJsonForCustomTools ? "JSON" : "Creator"} onChange={(v) => setAgent({ useJsonForCustomTools: v === "JSON" })} style={{ width: 160 }}
+                <Sel value={ag.useJsonForCustomTools ? "JSON" : "Creator"} onChange={(v) => {
+                  if (v === "JSON") setCustomToolsJson(JSON.stringify(ag.customTools || [], null, 2));
+                  setAgent({ useJsonForCustomTools: v === "JSON" });
+                }} style={{ width: 160 }}
                   opts={["Creator", "JSON"]} />
               </Row>
               {ag.useJsonForCustomTools ? (
                 <textarea className="set-input set-area" rows={6} style={{ width: "100%" }}
-                  value={JSON.stringify(ag.customTools || [], null, 2)}
-                  onChange={(e) => { try { setAgent({ customTools: JSON.parse(e.target.value) }); } catch { /* */ } }} />
+                  value={customToolsJson}
+                  onChange={(e) => setCustomToolsJson(e.target.value)} />
               ) : (
-                <CustomToolsEditor tools={ag.customTools || []} onChange={(v) => setAgent({ customTools: v })} />
+                <CustomToolsEditor tools={ag.customTools || []} onChange={(v) => { setAgent({ customTools: v }); setCustomToolsJson(JSON.stringify(v || [], null, 2)); }} />
               )}
             </Block>
 
             {/* MCP Servers */}
             <Block title="MCP Servers">
               <Row label="Mode">
-                <Sel value={ag.useJsonForMcpServers ? "JSON" : "Creator"} onChange={(v) => setAgent({ useJsonForMcpServers: v === "JSON" })} style={{ width: 160 }}
+                <Sel value={ag.useJsonForMcpServers ? "JSON" : "Creator"} onChange={(v) => {
+                  if (v === "JSON") setMcpServersJson(JSON.stringify(ag.mcpServers || [], null, 2));
+                  setAgent({ useJsonForMcpServers: v === "JSON" });
+                }} style={{ width: 160 }}
                   opts={["Creator", "JSON"]} />
               </Row>
               {ag.useJsonForMcpServers ? (
                 <textarea className="set-input set-area" rows={6} style={{ width: "100%" }}
-                  value={JSON.stringify(ag.mcpServers || [], null, 2)}
-                  onChange={(e) => { try { setAgent({ mcpServers: JSON.parse(e.target.value) }); } catch { /* */ } }} />
+                  value={mcpServersJson}
+                  onChange={(e) => setMcpServersJson(e.target.value)} />
               ) : (
-                <McpServersEditor servers={ag.mcpServers || []} onChange={(v) => setAgent({ mcpServers: v })} />
+                <McpServersEditor servers={ag.mcpServers || []} onChange={(v) => { setAgent({ mcpServers: v }); setMcpServersJson(JSON.stringify(v || [], null, 2)); }} />
               )}
             </Block>
 
@@ -533,13 +632,11 @@ export function SettingsModal({ themes, onClose, onApplied }: Props) {
               <Row label="Fallback Order"><Txt value={ag.submitFallbackOrder ?? "enter,linefeed"} onChange={(v) => setAgent({ submitFallbackOrder: v })} style={{ width: "100%" }}
                 placeholder="enter,linefeed,crlf" /></Row>
               <Check label="Enable Submit Profiles" checked={!!ag.enableTargetSubmitProfiles} onChange={(v) => setAgent({ enableTargetSubmitProfiles: v })} />
-              {ag.enableTargetSubmitProfiles && (
-                <div style={{ marginTop: 6 }}>
-                  <textarea className="set-input set-area" rows={6} style={{ width: "100%" }}
-                    value={JSON.stringify(ag.submitProfiles || [], null, 2)}
-                    onChange={(e) => { try { setAgent({ submitProfiles: JSON.parse(e.target.value) }); } catch { /* */ } }} />
-                </div>
-              )}
+              <div style={{ marginTop: 6 }}>
+                <textarea className="set-input set-area" rows={6} style={{ width: "100%" }}
+                  value={submitProfilesJson}
+                  onChange={(e) => setSubmitProfilesJson(e.target.value)} />
+              </div>
             </Block>
 
             {/* Agent Files & Skills */}
@@ -577,7 +674,7 @@ export function SettingsModal({ themes, onClose, onApplied }: Props) {
           <div className="set-scroll">
             <h2 className="set-h2">About</h2>
             <div className="set-box">
-              <h3 style={{ fontSize: 18, fontWeight: "bold", margin: "0 0 4px" }}>cmux3</h3>
+              <h3 style={{ fontSize: 18, fontWeight: "bold", margin: "0 0 4px" }}>wimux</h3>
               <p className="set-dim" style={{ margin: "0 0 12px", fontSize: 13, lineHeight: 1.5 }}>
                 A modern terminal multiplexer designed for AI coding agents. Split panes, workspaces, command palette, and intelligent terminal management.
               </p>
@@ -585,7 +682,7 @@ export function SettingsModal({ themes, onClose, onApplied }: Props) {
               <p className="mono set-dim" style={{ fontSize: 12, lineHeight: 1.8, margin: "12px 0 0" }}>
                 Runtime: .NET 10<br />
                 Frontend: React 19 + dockview<br />
-                Config: %LOCALAPPDATA%/cmux2/settings.json
+                Config: %LOCALAPPDATA%/wimux/settings.json
               </p>
             </div>
           </div>
@@ -597,11 +694,11 @@ export function SettingsModal({ themes, onClose, onApplied }: Props) {
   };
 
   return (
-    <div className="cmux-popup-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="cmux-settings-popup" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="wimux-popup-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="wimux-settings-popup" onMouseDown={(e) => e.stopPropagation()}>
         <div className="set-titlebar">
           <span>Settings</span>
-          <button className="cmux-icon-btn" onClick={onClose}>×</button>
+          <button className="wimux-icon-btn" onClick={onClose}>×</button>
         </div>
         <div className="set-body">
           <div className="set-nav">
@@ -617,7 +714,7 @@ export function SettingsModal({ themes, onClose, onApplied }: Props) {
         </div>
         <div className="set-bar">
           <button className="set-btn" onClick={reset}>Reset to Defaults</button>
-          <span className="cmux-spacer" />
+          <span className="wimux-spacer" />
           <button className="set-btn" onClick={exportSettings}>Export</button>
           <button className="set-btn" onClick={importSettings}>Import</button>
           <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }} onChange={onImport} />
@@ -627,4 +724,194 @@ export function SettingsModal({ themes, onClose, onApplied }: Props) {
       </div>
     </div>
   );
+}
+
+function buildSettingsWithJsonDrafts(settings: any, drafts: { customToolsJson: string; mcpServersJson: string; submitProfilesJson: string }) {
+  const agent = settings?.agent;
+  if (!agent) return { settings };
+
+  let nextAgent = { ...agent };
+  if (agent.useJsonForCustomTools) {
+    const parsed = parseJsonArrayDraft(drafts.customToolsJson, "custom tools");
+    if (parsed.error) return { error: parsed.error };
+    nextAgent = { ...nextAgent, customTools: parsed.value };
+  }
+
+  if (agent.useJsonForMcpServers) {
+    const parsed = parseJsonArrayDraft(drafts.mcpServersJson, "MCP servers");
+    if (parsed.error) return { error: parsed.error };
+    nextAgent = { ...nextAgent, mcpServers: parsed.value };
+  }
+
+  const parsedProfiles = parseJsonArrayDraft(drafts.submitProfilesJson, "submit profiles");
+  if (parsedProfiles.error) return { error: parsedProfiles.error };
+  nextAgent = { ...nextAgent, submitProfiles: parsedProfiles.value };
+
+  return { settings: { ...settings, agent: nextAgent } };
+}
+
+function parseJsonArrayDraft(text: string, label: string): { value?: any[]; error?: string } {
+  if (!text.trim()) return { value: [] };
+  try {
+    const value = JSON.parse(text);
+    if (!Array.isArray(value)) return { error: `${capitalize(label)} JSON must be an array.` };
+    return { value };
+  } catch (err: any) {
+    return { error: `Invalid ${label} JSON: ${err?.message || "parse error"}` };
+  }
+}
+
+function capitalize(value: string) {
+  return value ? value[0].toUpperCase() + value.slice(1) : value;
+}
+
+function normalizeAgentSettingsForSave(settings: any) {
+  const agent = settings?.agent;
+  if (!agent) return settings;
+
+  const customProviders = (agent.customProviders ?? []).filter((provider: any) => {
+    return (provider.name ?? "").trim()
+      || (provider.baseUrl ?? "").trim()
+      || (provider.model ?? "").trim()
+      || (provider.apiKeySecretName ?? "").trim();
+  }).map((provider: any) => {
+    const name = (provider.name ?? "").trim();
+    return {
+      ...provider,
+      name,
+      baseUrl: (provider.baseUrl ?? "").trim(),
+      model: (provider.model ?? "").trim(),
+      kind: (provider.kind || "anthropic").toLowerCase(),
+      authScheme: (provider.authScheme || "bearer").toLowerCase(),
+      apiKeySecretName: provider.apiKeySecretName || (name ? `agent.custom.${sanitizeSecretSegment(name)}.apiKey` : ""),
+      anthropicVersion: provider.anthropicVersion || "2023-06-01",
+    };
+  });
+
+  let activeCustomProviderName = agent.activeCustomProviderName ?? "";
+  if ((agent.activeProvider ?? "").toLowerCase() === "custom" && !activeCustomProviderName && customProviders.length > 0) {
+    activeCustomProviderName = customProviders[0].name;
+  }
+  const activeProvider = (agent.activeProvider || "openai").toLowerCase();
+  const normalizedActiveProvider = ["openai", "anthropic", "gemini", "custom"].includes(activeProvider) ? activeProvider : "openai";
+
+  return {
+    ...settings,
+    agent: {
+      ...agent,
+      agentName: (agent.agentName ?? "").trim() || "assistant",
+      handler: (agent.handler ?? "").trim() || "/agent",
+      additionalHandlers: (agent.additionalHandlers ?? "").trim(),
+      systemPrompt: (agent.systemPrompt ?? "").trim(),
+      activeProvider: normalizedActiveProvider,
+      activeCustomProviderName,
+      openAi: {
+        ...agent.openAi,
+        baseUrl: (agent.openAi?.baseUrl ?? "").trim(),
+        model: (agent.openAi?.model ?? "").trim(),
+        apiKeySecretName: agent.openAi?.apiKeySecretName || "agent.openai.apiKey",
+      },
+      anthropic: {
+        ...agent.anthropic,
+        baseUrl: (agent.anthropic?.baseUrl ?? "").trim(),
+        model: (agent.anthropic?.model ?? "").trim(),
+        apiKeySecretName: agent.anthropic?.apiKeySecretName || "agent.anthropic.apiKey",
+      },
+      gemini: {
+        ...agent.gemini,
+        baseUrl: (agent.gemini?.baseUrl ?? "").trim(),
+        model: (agent.gemini?.model ?? "").trim(),
+        apiKeySecretName: agent.gemini?.apiKeySecretName || "agent.gemini.apiKey",
+      },
+      exa: {
+        ...agent.exa,
+        baseUrl: (agent.exa?.baseUrl ?? "").trim(),
+        apiKeySecretName: agent.exa?.apiKeySecretName || "agent.exa.apiKey",
+      },
+      customProviders,
+      bashTimeoutSeconds: clampNumber(agent.bashTimeoutSeconds, 1, 1800, 120),
+      defaultSubmitKey: ["auto", "enter", "linefeed", "crlf"].includes((agent.defaultSubmitKey || "").toLowerCase())
+        ? (agent.defaultSubmitKey || "auto").toLowerCase()
+        : "auto",
+      submitFallbackWaitMs: clampNumber(agent.submitFallbackWaitMs, 0, 5000, 350),
+      submitFallbackOrder: (agent.submitFallbackOrder ?? "").trim() || "enter,linefeed",
+      chatFontFamily: (agent.chatFontFamily ?? "").trim() || settings.fontFamily,
+      chatFontSize: clampNumber(agent.chatFontSize, 9, 28, 13),
+      maxContextMessages: clampNumber(agent.maxContextMessages, 8, 500, 60),
+      contextBudgetTokens: clampNumber(agent.contextBudgetTokens, 2048, 1000000, 24000),
+      compactThresholdPercent: clampNumber(agent.compactThresholdPercent, 50, 95, 85),
+      keepRecentMessagesOnCompaction: clampNumber(agent.keepRecentMessagesOnCompaction, 4, 400, 20),
+      agentInstructionsPath: (agent.agentInstructionsPath ?? "").trim(),
+      skillsRootPath: (agent.skillsRootPath ?? "").trim(),
+    },
+  };
+}
+
+function validateAgentSettings(agent: any) {
+  const customProviders = Array.isArray(agent.customProviders) ? agent.customProviders : [];
+  const providerNames = new Set<string>();
+  for (const provider of customProviders) {
+    const name = (provider.name ?? "").trim();
+    if (!name) return "Custom provider name is required. Fill in 'Name' or remove the provider.";
+    if (!providerNames.add(name.toLowerCase())) return `Duplicate custom provider name: '${name}'.`;
+    if (!(provider.baseUrl ?? "").trim()) return `Custom provider '${name}' is missing 'Base URL'.`;
+    const kind = (provider.kind || "anthropic").toLowerCase();
+    if (kind !== "anthropic" && kind !== "openai") return `Custom provider '${name}' has unsupported API kind '${provider.kind}'.`;
+    const authScheme = (provider.authScheme || "bearer").toLowerCase();
+    if (authScheme !== "bearer" && authScheme !== "x-api-key") return `Custom provider '${name}' has unsupported auth scheme '${provider.authScheme}'.`;
+  }
+
+  const toolsError = validateNamedArray(agent.customTools, "Custom tool", "commandTemplate");
+  if (toolsError) return toolsError;
+
+  const serversError = validateNamedArray(agent.mcpServers, "MCP server", "command");
+  if (serversError) return serversError;
+
+  const profiles = Array.isArray(agent.submitProfiles) ? agent.submitProfiles : [];
+  const profileNames = new Set<string>();
+  for (let i = 0; i < profiles.length; i++) {
+    const profile = profiles[i];
+    const row = i + 1;
+    const name = (profile.name ?? "").trim();
+    if (!name) return `Submit profile at index ${row} is missing 'name'.`;
+    if (!profileNames.add(name.toLowerCase())) return `Duplicate submit profile name: '${name}'.`;
+    const order = (profile.submitOrder ?? "").trim();
+    if (!order) return `Submit profile '${name}' is missing 'submitOrder'.`;
+    for (const token of order.split(/[,;\s]+/).filter(Boolean)) {
+      const key = token.toLowerCase();
+      if (!["enter", "linefeed", "crlf", "lf", "cr", "ctrl+j", "ctrl+m"].includes(key)) {
+        return `Submit profile '${name}' has unsupported submit key '${token}'.`;
+      }
+    }
+    profile.repeatCount = clampNumber(profile.repeatCount, 1, 8, 1);
+    profile.delayMs = clampNumber(profile.delayMs, 0, 3000, 0);
+    profile.waitMs = Number(profile.waitMs) < 0 ? -1 : clampNumber(profile.waitMs, 0, 5000, 0);
+  }
+
+  return "";
+}
+
+function validateNamedArray(value: any, label: string, requiredField: string) {
+  if (!Array.isArray(value)) return "";
+  const names = new Set<string>();
+  for (let i = 0; i < value.length; i++) {
+    const item = value[i];
+    const row = i + 1;
+    const name = (item.name ?? "").trim();
+    if (!name) return `${label} at index ${row} is missing 'name'.`;
+    if (!names.add(name.toLowerCase())) return `Duplicate ${label.toLowerCase()} name: '${name}'.`;
+    if (!(item[requiredField] ?? "").trim()) return `${label} '${name}' is missing '${requiredField}'.`;
+  }
+  return "";
+}
+
+function clampNumber(value: any, min: number, max: number, fallback: number) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+function sanitizeSecretSegment(name: string) {
+  const value = name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_");
+  return value || "default";
 }

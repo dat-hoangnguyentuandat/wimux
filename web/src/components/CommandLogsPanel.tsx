@@ -58,26 +58,26 @@ export function CommandLogsPanel({ workspace, onClose, onInsert, onOpenVault }: 
   };
 
   return (
-    <div className="cmux-panel cmux-wide-data-panel cmux-command-logs-panel">
-      <div className="cmux-panel-toolbar">
-        <div className="cmux-panel-toolbar-row">
+    <div className="wimux-panel wimux-wide-data-panel wimux-command-logs-panel">
+      <div className="wimux-panel-toolbar">
+        <div className="wimux-panel-toolbar-row">
           <label>Date</label>
           <select value={date} onChange={(e) => { setQuery(""); setDate(e.target.value); }}>
             {dates.length === 0 && <option value={date}>{date}</option>}
             {dates.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
-          <button className="cmux-btn" onClick={() => { setQuery(""); api.getLogDates().then((d) => { setDates(d); setDate(d[0] ?? date); }); }}>Refresh</button>
-          <button className="cmux-btn" onClick={onOpenVault}>Session Vault</button>
-          <span className="cmux-spacer" />
+          <button className="wimux-btn" onClick={() => { setQuery(""); api.getLogDates().then((d) => { setDates(d); setDate(d[0] ?? date); }); }}>Refresh</button>
+          <button className="wimux-btn" onClick={onOpenVault}>Session Vault</button>
+          <span className="wimux-spacer" />
         </div>
-        <div className="cmux-panel-toolbar-row">
+        <div className="wimux-panel-toolbar-row">
           <label>Search</label>
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Command or path..." />
-          <button className="cmux-btn" onClick={() => { setQuery(""); }}>Clear</button>
+          <button className="wimux-btn" onClick={() => { setQuery(""); }}>Clear</button>
         </div>
       </div>
-      <div className="cmux-panel-body cmux-list-body cmux-wide-data-body cmux-command-logs-body">
-        <table className="cmux-grid">
+      <div className="wimux-panel-body wimux-list-body wimux-wide-data-body wimux-command-logs-body">
+        <table className="wimux-grid">
           <thead>
             <tr>
               <th style={{ width: 78 }}>Time</th>
@@ -103,22 +103,22 @@ export function CommandLogsPanel({ workspace, onClose, onInsert, onOpenVault }: 
                 <td>{fmtEntity(e.workspaceId, workspaceNameById[e.workspaceId] ?? "")}</td>
                 <td>{shortId(e.surfaceId)}</td>
                 <td className="mono">{shortId(e.paneId)}</td>
-                <td className="mono cmux-cmd-cell">{e.command}</td>
+                <td className="mono wimux-cmd-cell">{e.command}</td>
                 <td className="mono dim">{e.workingDirectory ?? "-"}</td>
                 <td className={e.exitCode === 0 ? "ok" : e.exitCode ? "err" : "dim"}>{e.exitCode == null ? "-" : e.exitCode}</td>
                 <td className="dim">{e.durationDisplay}</td>
               </tr>
             ))}
-            {entries.length === 0 && <tr><td colSpan={8} className="cmux-empty">No commands</td></tr>}
+            {entries.length === 0 && <tr><td colSpan={8} className="wimux-empty">No commands</td></tr>}
           </tbody>
         </table>
       </div>
-      <div className="cmux-panel-footer">
-        <button className="cmux-btn" onClick={() => entries.length && copy(entries[0])}>Copy Command</button>
-        <button className="cmux-btn" onClick={() => entries.length && insert(entries[0])}>Insert in Focused Pane</button>
-        <button className="cmux-btn primary" onClick={() => entries.length && run(entries[0])}>Run in Focused Pane</button>
-        <span className="cmux-spacer" />
-        <span className="dim cmux-footer-summary">{entries.length} entries</span>
+      <div className="wimux-panel-footer">
+        <button className="wimux-btn" onClick={() => entries.length && copy(entries[0])}>Copy Command</button>
+        <button className="wimux-btn" onClick={() => entries.length && insert(entries[0])}>Insert in Focused Pane</button>
+        <button className="wimux-btn primary" onClick={() => entries.length && run(entries[0])}>Run in Focused Pane</button>
+        <span className="wimux-spacer" />
+        <span className="dim wimux-footer-summary">{entries.length} entries</span>
       </div>
     </div>
   );

@@ -52,48 +52,48 @@ export function SessionVaultPanel({ workspace, onClose }: Props) {
   };
 
   return (
-    <div className="cmux-panel">
-      <div className="cmux-panel-toolbar">
-        <div className="cmux-panel-toolbar-row">
+    <div className="wimux-panel">
+      <div className="wimux-panel-toolbar">
+        <div className="wimux-panel-toolbar-row">
           <label>Search</label>
           <input style={{ width: 320 }} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="File, cwd, reason..." />
-          <button className="cmux-btn" onClick={load}>Refresh</button>
-          <span className="cmux-spacer" />
+          <button className="wimux-btn" onClick={load}>Refresh</button>
+          <span className="wimux-spacer" />
           <span className="dim">{items.length} entries</span>
         </div>
       </div>
-      <div className="cmux-panel-body cmux-split-body cmux-wide-split-body">
-        <div className="cmux-list">
-          {filtered.length === 0 && <div className="cmux-empty">No captured transcripts</div>}
+      <div className="wimux-panel-body wimux-split-body wimux-wide-split-body">
+        <div className="wimux-list">
+          {filtered.length === 0 && <div className="wimux-empty">No captured transcripts</div>}
           {filtered.map((t) => (
             <div
               key={t.filePath}
-              className={"cmux-list-item" + (selected?.filePath === t.filePath ? " active" : "")}
+              className={"wimux-list-item" + (selected?.filePath === t.filePath ? " active" : "")}
               onClick={() => setSelected(t)}
             >
-              <div className="cmux-list-title mono">{new Date(t.capturedAt).toLocaleString()}</div>
-              <div className="cmux-list-meta dim mono">
+              <div className="wimux-list-title mono">{new Date(t.capturedAt).toLocaleString()}</div>
+              <div className="wimux-list-meta dim mono">
                 {fmtEntity(t.workspaceId, workspace?.id === t.workspaceId ? workspace.name : "")} · {shortId(t.surfaceId)} · {shortId(t.paneId)} · {(t.sizeBytes / 1024).toFixed(1)} KB
               </div>
-              {t.workingDirectory && <div className="cmux-list-meta dim mono">{t.workingDirectory}</div>}
+              {t.workingDirectory && <div className="wimux-list-meta dim mono">{t.workingDirectory}</div>}
             </div>
           ))}
         </div>
-        <div className="cmux-split-divider" />
-        <div className="cmux-split-content">
-          <div className="cmux-transcript-header">
-            <div className="cmux-list-title">{selected ? selected.fileName : "Select a capture"}</div>
+        <div className="wimux-split-divider" />
+        <div className="wimux-split-content">
+          <div className="wimux-transcript-header">
+            <div className="wimux-list-title">{selected ? selected.fileName : "Select a capture"}</div>
             <div className="dim mono">
               {selected ? `${new Date(selected.capturedAt).toLocaleString()} · ${selected.workingDirectory ?? "-"}` : ""}
             </div>
           </div>
-          <pre className="cmux-transcript mono">{content || "Select a transcript"}</pre>
+          <pre className="wimux-transcript mono">{content || "Select a transcript"}</pre>
         </div>
       </div>
-      <div className="cmux-panel-footer">
-        <button className="cmux-btn" onClick={copyAll} disabled={!content}>Copy All</button>
-        <button className="cmux-btn" onClick={openFile} disabled={!selected}>Open File</button>
-        <span className="cmux-spacer" />
+      <div className="wimux-panel-footer">
+        <button className="wimux-btn" onClick={copyAll} disabled={!content}>Copy All</button>
+        <button className="wimux-btn" onClick={openFile} disabled={!selected}>Open File</button>
+        <span className="wimux-spacer" />
       </div>
     </div>
   );

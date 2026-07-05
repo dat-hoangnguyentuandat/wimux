@@ -482,7 +482,7 @@ function AppContent() {
     ],
     Help: [
       { label: "Keyboard Shortcuts", run: () => setOverlay("palette") },
-      { label: "About", run: () => { void dialog.alert("cmux3", "A terminal multiplexer for AI coding workflows."); } },
+      { label: "About", run: () => { void dialog.alert("wimux", "A terminal multiplexer for AI coding workflows."); } },
     ],
   }), [newWorkspace, newSurface, splitPane, toggleZoom, workspace, surface, refresh, openPanel, toggleSidebar, dialog]);
 
@@ -531,12 +531,12 @@ function AppContent() {
 
   const dockTheme = (settings?.uiThemeName === "Light") ? "dockview-theme-light" : "dockview-theme-abyss";
 
-  if (!state) return <div className="loading">Loading cmux3...</div>;
+  if (!state) return <div className="loading">Loading wimux...</div>;
 
   return (
     <div className="app-shell" onClick={() => { if (openMenu) setOpenMenu(null); if (surfaceMenu) setSurfaceMenu(null); if (shellMenuOpen) setShellMenuOpen(false); }}>
       <div className="menubar">
-        <span className="menubar-brand">cmux3</span>
+        <span className="menubar-brand">wimux</span>
         {Object.keys(menus).map((m) => (
           <div key={m} style={{ position: "relative" }}>
             <button className={"menu-item" + (openMenu === m ? " open" : "")}

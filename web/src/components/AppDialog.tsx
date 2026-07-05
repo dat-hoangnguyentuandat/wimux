@@ -67,14 +67,14 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
     <DialogContext.Provider value={{ alert, confirm, prompt }}>
       {children}
       {dialog && (
-        <div className="cmux-popup-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) close(dialog.kind === "alert" ? true : null); }}>
-          <div className="cmux-dialog" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="cmux-dialog-title">{dialog.title}</div>
-            {dialog.message && <div className="cmux-dialog-message">{dialog.message}</div>}
+        <div className="wimux-popup-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) close(dialog.kind === "alert" ? true : null); }}>
+          <div className="wimux-dialog" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="wimux-dialog-title">{dialog.title}</div>
+            {dialog.message && <div className="wimux-dialog-message">{dialog.message}</div>}
             {dialog.kind === "prompt" && (
               <input
                 ref={inputRef}
-                className="cmux-dialog-input"
+                className="wimux-dialog-input"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 onKeyDown={(e) => {
@@ -83,9 +83,9 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
                 }}
               />
             )}
-            <div className="cmux-dialog-actions">
-              {dialog.kind !== "alert" && <button className="cmux-btn" onClick={() => close(null)}>{dialog.cancelText ?? "Cancel"}</button>}
-              <button className="cmux-btn primary" onClick={() => close(dialog.kind === "prompt" ? value.trim() : true)}>
+            <div className="wimux-dialog-actions">
+              {dialog.kind !== "alert" && <button className="wimux-btn" onClick={() => close(null)}>{dialog.cancelText ?? "Cancel"}</button>}
+              <button className="wimux-btn primary" onClick={() => close(dialog.kind === "prompt" ? value.trim() : true)}>
                 {dialog.confirmText ?? "OK"}
               </button>
             </div>

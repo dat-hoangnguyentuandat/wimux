@@ -11,7 +11,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../server/Cmux.Web/wwwroot",
+    outDir: "../server/Wimux.Web/wwwroot",
     emptyOutDir: true,
   },
 });

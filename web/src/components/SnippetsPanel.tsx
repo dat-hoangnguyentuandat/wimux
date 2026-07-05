@@ -32,44 +32,44 @@ export function SnippetsPanel({ onClose, onInsert }: Props) {
   };
 
   return (
-    <div className="cmux-popup-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="cmux-popup-panel" onMouseDown={(e) => e.stopPropagation()} style={{ maxWidth: 600, maxHeight: 520 }}>
-      <div className="cmux-panel-toolbar">
-        <div className="cmux-panel-toolbar-row">
-          <span className="cmux-panel-title">SNIPPETS</span>
+    <div className="wimux-popup-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="wimux-popup-panel" onMouseDown={(e) => e.stopPropagation()} style={{ maxWidth: 600, maxHeight: 520 }}>
+      <div className="wimux-panel-toolbar">
+        <div className="wimux-panel-toolbar-row">
+          <span className="wimux-panel-title">SNIPPETS</span>
           <input style={{ flex: 1 }} placeholder="Search snippets..." value={query} onChange={(e) => setQuery(e.target.value)} />
-          <button className="cmux-btn" onClick={() => setEditing({ name: "", content: "", category: "General", tags: [], isFavorite: false } as Partial<Snippet>)}>New</button>
-          <button className="cmux-icon-btn" onClick={onClose}>×</button>
+          <button className="wimux-btn" onClick={() => setEditing({ name: "", content: "", category: "General", tags: [], isFavorite: false } as Partial<Snippet>)}>New</button>
+          <button className="wimux-icon-btn" onClick={onClose}>×</button>
         </div>
       </div>
       {editing ? (
-        <div className="cmux-panel-body">
-          <div className="cmux-settings-grid">
-            <label className="cmux-field"><span>Name</span><input value={editing.name ?? ""} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></label>
-            <label className="cmux-field"><span>Category</span>
-              <input list="cmux-snip-cats" value={editing.category ?? ""} onChange={(e) => setEditing({ ...editing, category: e.target.value })} />
-              <datalist id="cmux-snip-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
+        <div className="wimux-panel-body">
+          <div className="wimux-settings-grid">
+            <label className="wimux-field"><span>Name</span><input value={editing.name ?? ""} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></label>
+            <label className="wimux-field"><span>Category</span>
+              <input list="wimux-snip-cats" value={editing.category ?? ""} onChange={(e) => setEditing({ ...editing, category: e.target.value })} />
+              <datalist id="wimux-snip-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
             </label>
-            <label className="cmux-field full"><span>Content</span>
+            <label className="wimux-field full"><span>Content</span>
               <textarea rows={6} value={editing.content ?? ""} onChange={(e) => setEditing({ ...editing, content: e.target.value })} /></label>
-            <label className="cmux-field checkbox"><input type="checkbox" checked={!!editing.isFavorite} onChange={(e) => setEditing({ ...editing, isFavorite: e.target.checked })} /><span>Favorite</span></label>
+            <label className="wimux-field checkbox"><input type="checkbox" checked={!!editing.isFavorite} onChange={(e) => setEditing({ ...editing, isFavorite: e.target.checked })} /><span>Favorite</span></label>
           </div>
-          <div className="cmux-modal-actions">
+          <div className="wimux-modal-actions">
             <button onClick={() => setEditing(null)}>Cancel</button>
             <button className="primary" onClick={save}>Save</button>
           </div>
         </div>
       ) : (
-        <div className="cmux-panel-body">
-          {items.length === 0 && <div className="cmux-empty">No snippets</div>}
+        <div className="wimux-panel-body">
+          {items.length === 0 && <div className="wimux-empty">No snippets</div>}
           {items.map((s) => (
-            <div key={s.id} className="cmux-snippet-row">
-              <span className={"cmux-fav" + (s.isFavorite ? " on" : "")} onClick={() => toggleFav(s)} title="Toggle favorite">★</span>
-              <div className="cmux-snippet-info" onClick={() => insert(s)}>
-                <div className="cmux-snippet-name">{s.name} <span className="dim">· {s.category}</span></div>
-                <div className="cmux-snippet-content mono dim">{s.content}</div>
+            <div key={s.id} className="wimux-snippet-row">
+              <span className={"wimux-fav" + (s.isFavorite ? " on" : "")} onClick={() => toggleFav(s)} title="Toggle favorite">★</span>
+              <div className="wimux-snippet-info" onClick={() => insert(s)}>
+                <div className="wimux-snippet-name">{s.name} <span className="dim">· {s.category}</span></div>
+                <div className="wimux-snippet-content mono dim">{s.content}</div>
               </div>
-              <div className="cmux-snippet-actions">
+              <div className="wimux-snippet-actions">
                 <button onClick={() => setEditing(s)}>Edit</button>
                 <button onClick={() => remove(s.id)}>Delete</button>
               </div>

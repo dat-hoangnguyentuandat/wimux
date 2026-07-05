@@ -1,25 +1,25 @@
-# cmux3 remote installer. Downloads the latest release bundle, extracts it to
-# %LOCALAPPDATA%\Programs\cmux3 and puts cmux3 on the user PATH.
+# wimux remote installer. Downloads the latest release bundle, extracts it to
+# %LOCALAPPDATA%\Programs\wimux and puts wimux on the user PATH.
 #
 # One-liner:
-#   irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/cmux3/main/scripts/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
 #
 # Pin a version:
-#   $env:CMUX_VERSION="v0.1.0"; irm .../install.ps1 | iex
+#   $env:WIMUX_VERSION="v0.1.0"; irm .../install.ps1 | iex
 #
-# Override the source repo with $env:CMUX_REPO="owner/name".
+# Override the source repo with $env:WIMUX_REPO="owner/name".
 $ErrorActionPreference = "Stop"
 
-$repo    = if ($env:CMUX_REPO)    { $env:CMUX_REPO }    else { "dat-hoangnguyentuandat/cmux3" }
-$version = if ($env:CMUX_VERSION) { $env:CMUX_VERSION } else { "latest" }
+$repo    = if ($env:WIMUX_REPO)    { $env:WIMUX_REPO }    else { "dat-hoangnguyentuandat/wimux" }
+$version = if ($env:WIMUX_VERSION) { $env:WIMUX_VERSION } else { "latest" }
 $runtime = "win-x64"
-$asset   = "cmux3-$runtime.zip"
-$dest    = Join-Path $env:LOCALAPPDATA "Programs\cmux3"
+$asset   = "wimux-$runtime.zip"
+$dest    = Join-Path $env:LOCALAPPDATA "Programs\wimux"
 
-Write-Host "Installing cmux3 from $repo ($version)..." -ForegroundColor Cyan
+Write-Host "Installing wimux from $repo ($version)..." -ForegroundColor Cyan
 
 # Resolve the download URL via the GitHub API.
-$headers = @{ "User-Agent" = "cmux3-installer"; "Accept" = "application/vnd.github+json" }
+$headers = @{ "User-Agent" = "wimux-installer"; "Accept" = "application/vnd.github+json" }
 if ($version -eq "latest") {
   $api = "https://api.github.com/repos/$repo/releases/latest"
 } else {
@@ -37,12 +37,12 @@ if (-not $dl) {
   throw "Release '$($release.tag_name)' has no asset named '$asset'."
 }
 
-$tmp = Join-Path ([System.IO.Path]::GetTempPath()) "cmux3-$([guid]::NewGuid().ToString('N')).zip"
+$tmp = Join-Path ([System.IO.Path]::GetTempPath()) "wimux-$([guid]::NewGuid().ToString('N')).zip"
 Write-Host "Downloading $asset ..." -ForegroundColor DarkGray
-Invoke-WebRequest -Uri $dl -OutFile $tmp -Headers @{ "User-Agent" = "cmux3-installer" }
+Invoke-WebRequest -Uri $dl -OutFile $tmp -Headers @{ "User-Agent" = "wimux-installer" }
 
 # Stop a running instance so we can overwrite files.
-Get-Process cmux3 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process wimux -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 300
 
 if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
@@ -52,8 +52,8 @@ Write-Host "Extracting to $dest ..." -ForegroundColor DarkGray
 Expand-Archive -Path $tmp -DestinationPath $dest -Force
 Remove-Item -Force $tmp
 
-if (-not (Test-Path (Join-Path $dest "cmux3.exe"))) {
-  throw "Install failed: cmux3.exe not found in $dest"
+if (-not (Test-Path (Join-Path $dest "wimux.exe"))) {
+  throw "Install failed: wimux.exe not found in $dest"
 }
 
 # Add to user PATH if missing.
@@ -65,7 +65,7 @@ if (($userPath -split ";") -notcontains $dest) {
   Write-Host "Added $dest to your user PATH." -ForegroundColor Green
 }
 
-$ver = & (Join-Path $dest "cmux3.exe") version
+$ver = & (Join-Path $dest "wimux.exe") version
 Write-Host ""
 Write-Host "Installed $ver" -ForegroundColor Green
-Write-Host "Open a NEW terminal and run:  cmux3" -ForegroundColor Green
+Write-Host "Open a NEW terminal and run:  wimux" -ForegroundColor Green

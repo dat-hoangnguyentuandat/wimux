@@ -45,34 +45,34 @@ export function HistoryPicker({ paneId, onClose, onPick }: Props) {
   };
 
   return (
-    <div className="cmux-popup-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="cmux-popup-panel" onMouseDown={(e) => e.stopPropagation()} style={{ maxWidth: 620, maxHeight: 560 }}>
-        <div className="cmux-panel-toolbar">
-          <div className="cmux-panel-toolbar-row">
-            <span className="cmux-panel-title">COMMAND HISTORY{paneId ? ` · ${paneId.slice(0, 8)}` : ""}</span>
-            <span className="cmux-spacer" />
-            <button className="cmux-icon-btn" onClick={onClose}>×</button>
+    <div className="wimux-popup-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="wimux-popup-panel" onMouseDown={(e) => e.stopPropagation()} style={{ maxWidth: 620, maxHeight: 560 }}>
+        <div className="wimux-panel-toolbar">
+          <div className="wimux-panel-toolbar-row">
+            <span className="wimux-panel-title">COMMAND HISTORY{paneId ? ` · ${paneId.slice(0, 8)}` : ""}</span>
+            <span className="wimux-spacer" />
+            <button className="wimux-icon-btn" onClick={onClose}>×</button>
           </div>
         </div>
-        <div className="cmux-panel-toolbar" style={{ borderTop: "none" }}>
-          <div className="cmux-panel-toolbar-row">
+        <div className="wimux-panel-toolbar" style={{ borderTop: "none" }}>
+          <div className="wimux-panel-toolbar-row">
             <input ref={inputRef} style={{ flex: 1 }} placeholder="Search history (Enter = run, Shift+Enter = insert)..."
               value={query} onChange={(e) => { setQuery(e.target.value); setIndex(0); }} onKeyDown={onKey} />
           </div>
         </div>
-        <div className="cmux-panel-body" style={{ maxHeight: 400, padding: 0, overflow: "auto" }}>
-          <table className="cmux-grid">
+        <div className="wimux-panel-body" style={{ maxHeight: 400, padding: 0, overflow: "auto" }}>
+          <table className="wimux-grid">
             <thead>
               <tr><th style={{ width: 56 }}>#</th><th>Command</th></tr>
             </thead>
             <tbody>
               {filtered.map((c, i) => (
-                <tr key={i} className={i === clamped ? "cmux-row-active" : ""} onMouseEnter={() => setIndex(i)} onClick={() => { onPick(c + "\r"); onClose(); }}>
+                <tr key={i} className={i === clamped ? "wimux-row-active" : ""} onMouseEnter={() => setIndex(i)} onClick={() => { onPick(c + "\r"); onClose(); }}>
                   <td className="dim mono">{i + 1}</td>
                   <td className="mono">{c}</td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={2} className="cmux-empty">No history</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={2} className="wimux-empty">No history</td></tr>}
             </tbody>
           </table>
         </div>

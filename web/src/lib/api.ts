@@ -137,16 +137,28 @@ export const api = {
   // ── Agent runtime ──────────────────────────────────────────────
   getAgentSettings: () => req<any>("/api/agent/settings"),
   saveAgentSettings: (s: any) => req<any>("/api/agent/settings", { method: "PUT", headers: j, body: JSON.stringify(s) }),
-  setAgentSecret: (name: string, value: string) =>
+  setAgentSecret: (name: string, value: string | null) =>
     req<void>("/api/agent/secret", { method: "PUT", headers: j, body: JSON.stringify({ name, value }) }),
+  clearAgentSecret: (name: string) =>
+    req<void>("/api/agent/secret", { method: "PUT", headers: j, body: JSON.stringify({ name, value: null }) }),
   sendAgentPrompt: (paneId: string, prompt: string, threadId?: string) =>
     req<{ ok: boolean; threadId?: string; error?: string }>("/api/agent/send", { method: "POST", headers: j, body: JSON.stringify({ paneId, prompt, threadId }) }),
 
   // ── Agent threads ──────────────────────────────────────────────
-  getThreads: () => req<AgentThread[]>("/api/threads"),
+  getThreads: (opts?: { workspaceId?: string; surfaceId?: string; paneId?: string; q?: string }) => {
+    const p = new URLSearchParams();
+    if (opts?.workspaceId) p.set("workspaceId", opts.workspaceId);
+    if (opts?.surfaceId) p.set("surfaceId", opts.surfaceId);
+    if (opts?.paneId) p.set("paneId", opts.paneId);
+    if (opts?.q) p.set("q", opts.q);
+    const qs = p.toString();
+    return req<AgentThread[]>(`/api/threads${qs ? `?${qs}` : ""}`);
+  },
   getThreadMessages: (threadId: string) => req<AgentMessage[]>(`/api/threads/${threadId}/messages`),
   createThread: (paneId: string) =>
     req<AgentThread>("/api/threads", { method: "POST", headers: j, body: JSON.stringify({ paneId }) }),
+  activateThread: (threadId: string, opts?: { workspaceId?: string; surfaceId?: string; paneId?: string }) =>
+    req<void>(`/api/threads/${threadId}/activate`, { method: "POST", headers: j, body: JSON.stringify(opts || {}) }),
   deleteThread: (threadId: string) => req<void>(`/api/threads/${threadId}`, { method: "DELETE" }),
   deleteThreadMessage: (threadId: string, messageId: string) =>
     req<void>(`/api/threads/${threadId}/messages/${messageId}`, { method: "DELETE" }),
@@ -174,6 +186,12 @@ export const api = {
   getAgentConversation: (sessionFilePath: string, max?: number) =>
     req<{ role: string; content: string; timestamp: string }[]>(
       `/api/agents/conversation?sessionFilePath=${encodeURIComponent(sessionFilePath)}${max ? `&max=${max}` : ""}`),
+  sendExternalAgentMessage: (agent: { pid: number; projectPath?: string }, text: string) =>
+    req<{ ok: boolean; paneId?: string; error?: string }>("/api/agents/send", {
+      method: "POST",
+      headers: j,
+      body: JSON.stringify({ pid: agent.pid, projectPath: agent.projectPath, text }),
+    }),
 
   // ── Workspace env / ssh ────────────────────────────────────────
   getWorkspaceEnv: (id: string) => req<Record<string, string>>(`/api/workspaces/${id}/env`),

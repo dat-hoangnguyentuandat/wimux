@@ -8,7 +8,7 @@
   --accent: #818cf8;
   --danger: #f7768e;
 
-  /* Aliases for components ported from cmux2 */
+  /* Aliases for components ported from wimux2 */
   --sidebar-bg: var(--bg-alt);
   --sidebar-hover: rgba(255,255,255,0.06);
   --sidebar-selected: rgba(129,140,248,0.15);
@@ -71,9 +71,9 @@ body {
   flex-direction: column;
 }
 
-/* ── Standalone workspace sidebar (outside dockview, matches cmux2) ── */
-.cmux-layout { display: flex; height: 100%; }
-.cmux-sidebar {
+/* ── Standalone workspace sidebar (outside dockview, matches wimux2) ── */
+.wimux-layout { display: flex; height: 100%; }
+.wimux-sidebar {
   width: 260px; flex-shrink: 0;
   background: var(--bg-alt);
   border-right: 1px solid var(--border);
@@ -606,13 +606,13 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .write-popup-send:disabled { opacity: 0.35; cursor: default; }
 
 /* ── Popup overlays ── */
-.cmux-popup-overlay { position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.55); display: grid; place-items: center; }
-.cmux-popup-panel {
+.wimux-popup-overlay { position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.55); display: grid; place-items: center; }
+.wimux-popup-panel {
   width: 100%; background: var(--bg); border: 1px solid var(--border);
   border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,0.65);
   display: flex; flex-direction: column; overflow: hidden;
 }
-.cmux-dialog {
+.wimux-dialog {
   width: min(420px, 92vw);
   background: var(--bg);
   border: 1px solid var(--border);
@@ -620,19 +620,19 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   box-shadow: 0 20px 60px rgba(0,0,0,0.65);
   padding: 16px;
 }
-.cmux-dialog-title {
+.wimux-dialog-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
   margin-bottom: 8px;
 }
-.cmux-dialog-message {
+.wimux-dialog-message {
   color: var(--text-dim);
   font-size: 13px;
   line-height: 1.45;
   margin-bottom: 12px;
 }
-.cmux-dialog-input {
+.wimux-dialog-input {
   width: 100%;
   background: var(--panel);
   border: 1px solid var(--border);
@@ -642,8 +642,8 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   font-size: 13px;
   outline: none;
 }
-.cmux-dialog-input:focus { border-color: var(--accent); }
-.cmux-dialog-actions {
+.wimux-dialog-input:focus { border-color: var(--accent); }
+.wimux-dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -651,7 +651,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 }
 
 /* ── Settings popup ── */
-.cmux-settings-popup {
+.wimux-settings-popup {
   width: min(780px, 94vw); height: min(640px, 90vh); background: var(--bg); border: 1px solid var(--border);
   border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,0.65);
   display: flex; flex-direction: column; overflow: hidden;
@@ -704,44 +704,44 @@ select.set-input { cursor: pointer; }
 .kb-key { color: var(--accent); font-weight: 600; font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; }
 
 /* ── Agent chat ── */
-.cmux-agent-chat { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg-alt); }
-.cmux-chat-threadbar { display: flex; align-items: center; gap: 6px; padding: 8px 10px 6px; background: var(--bg-alt); }
-.cmux-chat-search { flex: 1; height: 28px; min-width: 0; }
-.cmux-search-icon { color: var(--text-dim); width: 14px; height: 14px; flex-shrink: 0; }
-.cmux-chat-threads { height: 120px; flex-shrink: 0; overflow: auto; margin: 0 10px 6px; border: 1px solid var(--border); background: var(--panel); }
-.cmux-thread-item { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 6px 8px; cursor: pointer; font-size: 12px; border: 0; border-bottom: 1px solid rgba(255,255,255,0.03); background: transparent; color: var(--text); text-align: left; border-radius: 0; }
-.cmux-thread-item:hover { background: rgba(255,255,255,0.04); }
-.cmux-thread-item.active { background: rgba(129,140,248,0.16); }
-.cmux-thread-title { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cmux-thread-meta { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cmux-chat-info { padding: 0 10px 6px; color: var(--text-dim); font-size: 10px; line-height: 1.35; flex-shrink: 0; }
-.cmux-message-search-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-.cmux-chat-body { flex: 1 1 auto; overflow: auto; min-height: 96px; margin: 0 10px 8px; padding: 6px; border: 1px solid var(--border); background: var(--panel); }
-.cmux-chat-msg { display: flex; align-items: flex-start; gap: 6px; padding: 8px 6px 8px 8px; border-radius: 6px; margin-bottom: 6px; background: rgba(34,26,46,0.74); }
-.cmux-chat-msg.user { background: rgba(129,140,248,0.12); }
-.cmux-chat-msg.assistant { background: rgba(255,255,255,0.04); }
-.cmux-chat-msg.error { background: rgba(239,68,68,0.14); }
-.cmux-chat-msg-main { flex: 1; min-width: 0; }
-.cmux-chat-role { font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
-.cmux-chat-content { font-size: 13px; overflow-wrap: anywhere; }
-.cmux-chat-meta { font-size: 10px; margin-top: 4px; min-height: 12px; }
-.cmux-chat-delete { flex-shrink: 0; opacity: 0.65; }
-.cmux-agent-input-wrap { margin: 0 10px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); overflow: visible; flex-shrink: 0; }
-.cmux-agent-textarea { display: block; width: 100%; min-height: 60px; max-height: 120px; resize: none; border: 0; background: transparent; color: var(--text); font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; line-height: 1.5; padding: 10px 10px 0; outline: none; }
-.cmux-agent-input-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px; }
-.cmux-agent-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-.cmux-agent-send { width: 28px; height: 28px; border-radius: 14px; border: 0; background: var(--accent); color: #fff; cursor: pointer; display: grid; place-items: center; flex-shrink: 0; padding: 0; line-height: 1; }
-.cmux-agent-send:hover { opacity: 0.85; }
-.cmux-agent-send:disabled { opacity: 0.35; cursor: default; }
-.cmux-provider-btn { display: inline-flex; align-items: center; gap: 6px; max-width: 230px; background: transparent; border: 0; color: var(--text); border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; white-space: nowrap; overflow: hidden; }
-.cmux-provider-btn:hover { background: var(--bg); }
-.cmux-provider-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; flex-shrink: 0; }
-.cmux-provider-current { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cmux-provider-caret { color: var(--text-dim); width: 10px; height: 10px; flex-shrink: 0; }
-.cmux-provider-menu { position: absolute; bottom: 100%; left: 0; margin-bottom: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px; width: 260px; box-shadow: 0 -4px 20px rgba(0,0,0,0.45); z-index: 50; }
-.cmux-provider-item { width: 100%; display: grid; grid-template-columns: auto minmax(74px, 1fr) minmax(0, 1.6fr); align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; background: transparent; border: 0; color: var(--text); text-align: left; }
-.cmux-provider-item:hover { background: var(--bg); }
-.cmux-provider-name, .cmux-provider-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wimux-agent-chat { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg-alt); }
+.wimux-chat-threadbar { display: flex; align-items: center; gap: 6px; padding: 8px 10px 6px; background: var(--bg-alt); }
+.wimux-chat-search { flex: 1; height: 28px; min-width: 0; }
+.wimux-search-icon { color: var(--text-dim); width: 14px; height: 14px; flex-shrink: 0; }
+.wimux-chat-threads { height: 120px; flex-shrink: 0; overflow: auto; margin: 0 10px 6px; border: 1px solid var(--border); background: var(--panel); }
+.wimux-thread-item { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 6px 8px; cursor: pointer; font-size: 12px; border: 0; border-bottom: 1px solid rgba(255,255,255,0.03); background: transparent; color: var(--text); text-align: left; border-radius: 0; }
+.wimux-thread-item:hover { background: rgba(255,255,255,0.04); }
+.wimux-thread-item.active { background: rgba(129,140,248,0.16); }
+.wimux-thread-title { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wimux-thread-meta { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wimux-chat-info { padding: 0 10px 6px; color: var(--text-dim); font-size: 10px; line-height: 1.35; flex-shrink: 0; }
+.wimux-message-search-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.wimux-chat-body { flex: 1 1 auto; overflow: auto; min-height: 96px; margin: 0 10px 8px; padding: 6px; border: 1px solid var(--border); background: var(--panel); }
+.wimux-chat-msg { display: flex; align-items: flex-start; gap: 6px; padding: 8px 6px 8px 8px; border-radius: 6px; margin-bottom: 6px; background: rgba(34,26,46,0.74); }
+.wimux-chat-msg.user { background: rgba(129,140,248,0.12); }
+.wimux-chat-msg.assistant { background: rgba(255,255,255,0.04); }
+.wimux-chat-msg.error { background: rgba(239,68,68,0.14); }
+.wimux-chat-msg-main { flex: 1; min-width: 0; }
+.wimux-chat-role { font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
+.wimux-chat-content { font-size: 13px; overflow-wrap: anywhere; }
+.wimux-chat-meta { font-size: 10px; margin-top: 4px; min-height: 12px; }
+.wimux-chat-delete { flex-shrink: 0; opacity: 0.65; }
+.wimux-agent-input-wrap { margin: 0 10px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); overflow: visible; flex-shrink: 0; }
+.wimux-agent-textarea { display: block; width: 100%; min-height: 60px; max-height: 120px; resize: none; border: 0; background: transparent; color: var(--text); font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; line-height: 1.5; padding: 10px 10px 0; outline: none; }
+.wimux-agent-input-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px; }
+.wimux-agent-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.wimux-agent-send { width: 28px; height: 28px; border-radius: 14px; border: 0; background: var(--accent); color: #fff; cursor: pointer; display: grid; place-items: center; flex-shrink: 0; padding: 0; line-height: 1; }
+.wimux-agent-send:hover { opacity: 0.85; }
+.wimux-agent-send:disabled { opacity: 0.35; cursor: default; }
+.wimux-provider-btn { display: inline-flex; align-items: center; gap: 6px; max-width: 230px; background: transparent; border: 0; color: var(--text); border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.wimux-provider-btn:hover { background: var(--bg); }
+.wimux-provider-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; flex-shrink: 0; }
+.wimux-provider-current { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wimux-provider-caret { color: var(--text-dim); width: 10px; height: 10px; flex-shrink: 0; }
+.wimux-provider-menu { position: absolute; bottom: 100%; left: 0; margin-bottom: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px; width: 260px; box-shadow: 0 -4px 20px rgba(0,0,0,0.45); z-index: 50; }
+.wimux-provider-item { width: 100%; display: grid; grid-template-columns: auto minmax(74px, 1fr) minmax(0, 1.6fr); align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; background: transparent; border: 0; color: var(--text); text-align: left; }
+.wimux-provider-item:hover { background: var(--bg); }
+.wimux-provider-name, .wimux-provider-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Dockview overrides ── */
 .dv-dock { --dv-background-color: var(--bg) !important; }
@@ -753,14 +753,14 @@ select.set-input { cursor: pointer; }
   opacity: 0.55;
 }
 /* Surface tabs portal — blend with native tabs. */
-.cmux-surface-slot { overflow: hidden; max-width: 65%; }
-.cmux-surface-slot .tabbar { height: 100%; background: transparent; border-bottom: none; }
-.cmux-surface-slot .tabs { flex: 0 1 auto; }
-.cmux-surface-slot .tab { min-width: unset; height: 100%; padding: 0 10px; border-radius: 0; background: transparent; }
-.cmux-surface-slot .tab.active { background: var(--panel); }
-.cmux-surface-slot .tab-add { height: 100%; padding: 0 8px; font-size: 14px; border-radius: 0; }
+.wimux-surface-slot { overflow: hidden; max-width: 65%; }
+.wimux-surface-slot .tabbar { height: 100%; background: transparent; border-bottom: none; }
+.wimux-surface-slot .tabs { flex: 0 1 auto; }
+.wimux-surface-slot .tab { min-width: unset; height: 100%; padding: 0 10px; border-radius: 0; background: transparent; }
+.wimux-surface-slot .tab.active { background: var(--panel); }
+.wimux-surface-slot .tab-add { height: 100%; padding: 0 8px; font-size: 14px; border-radius: 0; }
 .docked-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; min-width: 0; }
-.docked-panel > .cmux-panel {
+.docked-panel > .wimux-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -769,15 +769,15 @@ select.set-input { cursor: pointer; }
   min-height: 0;
   background: var(--bg);
 }
-.docked-panel > .cmux-panel > .cmux-agent-chat { flex: 1 1 auto; height: auto; }
-.cmux-panel-toolbar { display: flex; flex-direction: column; gap: 8px; padding: 12px 12px 8px; border-bottom: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
-.cmux-panel-toolbar-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
-.cmux-panel-title { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--text-dim); }
-.cmux-panel-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px; min-height: 0; min-width: 0; }
-.cmux-panel-footer { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
-.cmux-spacer { flex: 1; }
-.cmux-icon-btn { background: transparent; border: 0; color: var(--text-dim); cursor: pointer; padding: 4px 6px; border-radius: 4px; font-size: 14px; display: inline-grid; place-items: center; }
-.cmux-icon-btn:hover { background: var(--panel); color: var(--text); }
+.docked-panel > .wimux-panel > .wimux-agent-chat { flex: 1 1 auto; height: auto; }
+.wimux-panel-toolbar { display: flex; flex-direction: column; gap: 8px; padding: 12px 12px 8px; border-bottom: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
+.wimux-panel-toolbar-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.wimux-panel-title { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--text-dim); }
+.wimux-panel-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px; min-height: 0; min-width: 0; }
+.wimux-panel-footer { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
+.wimux-spacer { flex: 1; }
+.wimux-icon-btn { background: transparent; border: 0; color: var(--text-dim); cursor: pointer; padding: 4px 6px; border-radius: 4px; font-size: 14px; display: inline-grid; place-items: center; }
+.wimux-icon-btn:hover { background: var(--panel); color: var(--text); }
 
 /* ── Statusbar ── */
 .statusbar { height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: var(--bg-alt); border-top: 1px solid var(--border); font-size: 11px; color: var(--text-dim); }
@@ -793,113 +793,116 @@ select.set-input { cursor: pointer; }
 .terminal-host { display: flex; flex-direction: column; height: 100%; }
 
 /* ── Snippets / Notifications / QuickOpen ── */
-.cmux-snippet-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; }
-.cmux-snippet-row:hover { background: rgba(255,255,255,0.03); }
-.cmux-snippet-info { flex: 1; cursor: pointer; min-width: 0; }
-.cmux-snippet-name { font-size: 13px; }
-.cmux-snippet-content { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cmux-snippet-actions { display: flex; gap: 4px; }
-.cmux-fav { cursor: pointer; font-size: 14px; color: var(--text-dim); }
-.cmux-fav.on { color: #fbbf24; }
-.cmux-notif-row { padding: 8px 10px; border-radius: 4px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); }
-.cmux-notif-row:hover { background: rgba(255,255,255,0.03); }
-.cmux-notif-row.unread { border-left: 3px solid var(--accent); }
-.cmux-notif-title { font-size: 13px; font-weight: 600; }
-.cmux-notif-sub { font-size: 11px; color: var(--text-dim); }
-.cmux-notif-body { font-size: 12px; margin-top: 2px; }
-.cmux-notif-time { font-size: 10px; margin-top: 4px; }
-.cmux-quickopen-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; }
-.cmux-quickopen-item:hover, .cmux-quickopen-item.active { background: rgba(129,140,248,0.15); }
-.cmux-quickopen-name { font-size: 13px; font-weight: 500; }
-.cmux-quickopen-path { font-size: 11px; }
+.wimux-snippet-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; }
+.wimux-snippet-row:hover { background: rgba(255,255,255,0.03); }
+.wimux-snippet-info { flex: 1; cursor: pointer; min-width: 0; }
+.wimux-snippet-name { font-size: 13px; }
+.wimux-snippet-content { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wimux-snippet-actions { display: flex; gap: 4px; }
+.wimux-fav { cursor: pointer; font-size: 14px; color: var(--text-dim); }
+.wimux-fav.on { color: #fbbf24; }
+.wimux-notif-row { padding: 8px 10px; border-radius: 4px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.wimux-notif-row:hover { background: rgba(255,255,255,0.03); }
+.wimux-notif-row.unread { border-left: 3px solid var(--accent); }
+.wimux-notif-title { font-size: 13px; font-weight: 600; }
+.wimux-notif-sub { font-size: 11px; color: var(--text-dim); }
+.wimux-notif-body { font-size: 12px; margin-top: 2px; }
+.wimux-notif-time { font-size: 10px; margin-top: 4px; }
+.wimux-quickopen-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; }
+.wimux-quickopen-item:hover, .wimux-quickopen-item.active { background: rgba(129,140,248,0.15); }
+.wimux-quickopen-name { font-size: 13px; font-weight: 500; }
+.wimux-quickopen-path { font-size: 11px; }
 
 /* ── Grid / List / Misc ── */
-.cmux-grid { width: 100%; border-collapse: collapse; }
-.cmux-grid th, .cmux-grid td { padding: 6px 10px; text-align: left; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.03); }
-.cmux-row-active { background: rgba(129,140,248,0.15); }
-.cmux-list { flex: 1; overflow: auto; }
-.cmux-split-body > .cmux-list,
-.cmux-split-body > .cmux-tree {
+.wimux-grid { width: 100%; border-collapse: collapse; }
+.wimux-grid th, .wimux-grid td { padding: 6px 10px; text-align: left; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.wimux-row-active { background: rgba(129,140,248,0.15); }
+.wimux-list { flex: 1; overflow: auto; }
+.wimux-split-body > .wimux-list,
+.wimux-split-body > .wimux-tree {
   flex: 0 0 min(38%, 420px);
   min-width: 220px;
   overflow: auto;
   border: 1px solid var(--border);
   background: var(--panel);
 }
-.cmux-list-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); }
-.cmux-list-item:hover { background: rgba(255,255,255,0.03); }
-.cmux-list-item.active { background: rgba(129,140,248,0.15); }
-.cmux-list-row { display: flex; align-items: center; justify-content: space-between; }
-.cmux-list-title { font-size: 13px; }
-.cmux-list-meta { font-size: 11px; }
-.cmux-split-body { display: flex; min-width: 0; min-height: 0; padding: 10px 12px; gap: 8px; }
-.cmux-wide-split-body { overflow: auto; }
-.cmux-wide-split-body > .cmux-list,
-.cmux-wide-split-body > .cmux-tree {
+.wimux-list-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.wimux-list-item:hover { background: rgba(255,255,255,0.03); }
+.wimux-list-item.active { background: rgba(129,140,248,0.15); }
+.wimux-list-row { display: flex; align-items: center; justify-content: space-between; }
+.wimux-list-title { font-size: 13px; }
+.wimux-list-meta { font-size: 11px; }
+.wimux-split-body { display: flex; min-width: 0; min-height: 0; padding: 10px 12px; gap: 8px; }
+.wimux-wide-split-body { overflow: auto; }
+.wimux-wide-split-body > .wimux-list,
+.wimux-wide-split-body > .wimux-tree {
   flex-basis: 280px;
 }
-.cmux-wide-split-body > .cmux-split-content {
+.wimux-wide-split-body > .wimux-split-content {
   min-width: 320px;
 }
-.cmux-split-divider { width: 1px; background: var(--border); }
-.cmux-split-content { flex: 1; overflow: auto; padding: 8px 12px; min-width: 0; border: 1px solid var(--border); background: var(--panel); }
-.cmux-mono-pre { font-family: "Cascadia Code", Consolas, monospace; font-size: 11px; color: var(--text-dim); }
-.cmux-btn { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
-.cmux-btn:hover { background: var(--panel); }
-.cmux-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.cmux-btn, .cmux-modal-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-.cmux-empty { padding: 24px; text-align: center; color: var(--text-dim); }
-.cmux-section { margin: 8px 0 0; font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.6px; }
+.wimux-split-divider { width: 1px; background: var(--border); }
+.wimux-split-content { flex: 1; overflow: auto; padding: 8px 12px; min-width: 0; border: 1px solid var(--border); background: var(--panel); }
+.wimux-mono-pre { font-family: "Cascadia Code", Consolas, monospace; font-size: 11px; color: var(--text-dim); }
+.wimux-btn { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+.wimux-btn:hover { background: var(--panel); }
+.wimux-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.wimux-btn, .wimux-modal-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.wimux-empty { padding: 24px; text-align: center; color: var(--text-dim); }
+.wimux-section { margin: 8px 0 0; font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.6px; }
 
 /* ── Quota panel ── */
-.cmux-quota-body { overflow: auto; padding: 8px 12px; }
-.cmux-quota-summary { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
-.cmux-stat { text-align: center; }
-.cmux-stat-label { font-size: 10px; color: var(--text-dim); }
-.cmux-footer-summary { font-size: 11px; color: var(--text-dim); }
-.cmux-cmd-cell { font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; }
+.wimux-quota-body { overflow: auto; padding: 8px 12px; }
+.wimux-quota-summary { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.wimux-stat { text-align: center; }
+.wimux-stat-label { font-size: 10px; color: var(--text-dim); }
+.wimux-footer-summary { font-size: 11px; color: var(--text-dim); }
+.wimux-cmd-cell { font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; }
 
 /* ── Agent panels ── */
-.cmux-agent-messages { flex: 1; overflow: auto; min-height: 0; }
-.cmux-agent-msg { padding: 6px 8px; border-radius: 6px; margin-bottom: 6px; background: rgba(255,255,255,0.03); }
-.cmux-agent-msg.user { background: rgba(129,140,248,0.10); }
-.cmux-agent-role { font-size: 10px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 2px; }
-.cmux-agent-content { font-size: 13px; }
-.cmux-agent-preview { padding: 10px; font-size: 13px; }
+.wimux-agent-messages { flex: 1; overflow: auto; min-height: 0; }
+.wimux-agent-msg { padding: 6px 8px; border-radius: 6px; margin-bottom: 6px; background: rgba(255,255,255,0.03); }
+.wimux-agent-msg.user { background: rgba(129,140,248,0.10); }
+.wimux-agent-msg-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; }
+.wimux-agent-msg-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.wimux-agent-msg-actions .wimux-icon-btn { width: 24px; height: 22px; font-size: 10px; }
+.wimux-agent-role { font-size: 10px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 2px; }
+.wimux-agent-content { font-size: 13px; }
+.wimux-agent-preview { padding: 10px; font-size: 13px; }
 
 /* ── Source tree ── */
-.cmux-tree { font-size: 13px; }
-.cmux-tree-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; }
-.cmux-tree-row:hover { color: var(--accent); }
-.cmux-tree-icon { width: 16px; height: 16px; display: inline-grid; place-items: center; flex-shrink: 0; }
-.cmux-tree-dot { width: 3px; height: 3px; border-radius: 50%; background: currentColor; display: inline-block; opacity: 0.7; }
+.wimux-tree { font-size: 13px; }
+.wimux-tree-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; }
+.wimux-tree-row:hover { color: var(--accent); }
+.wimux-tree-icon { width: 16px; height: 16px; display: inline-grid; place-items: center; flex-shrink: 0; }
+.wimux-tree-dot { width: 3px; height: 3px; border-radius: 50%; background: currentColor; display: inline-block; opacity: 0.7; }
 
 /* ── Transcripts ── */
-.cmux-transcript { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
-.cmux-transcript-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+.wimux-transcript { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.wimux-transcript-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
 
 /* ── KG ── */
-.cmux-kg-host { display: flex; flex-direction: column; height: 100%; }
-.cmux-kg-svg { width: 100%; height: 100%; }
+.wimux-kg-host { display: flex; flex-direction: column; height: 100%; }
+.wimux-kg-svg { width: 100%; height: 100%; }
 
 /* ── Preview ── */
-.cmux-preview-header { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.wimux-preview-header { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
 
 /* ── List items ── */
-.cmux-list-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 0; }
-.cmux-list-tag { background: rgba(129,140,248,0.15); color: var(--accent); font-size: 10px; padding: 2px 6px; border-radius: 3px; }
+.wimux-list-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 0; }
+.wimux-list-tag { background: rgba(129,140,248,0.15); color: var(--accent); font-size: 10px; padding: 2px 6px; border-radius: 3px; }
 
 /* Wide data panels keep horizontal scrolling local to their content. */
-.cmux-wide-data-body { overflow: auto; padding: 8px 0; }
-.cmux-wide-data-panel .cmux-grid { min-width: 920px; }
-.cmux-command-logs-panel .cmux-grid { min-width: 1120px; }
-.cmux-wide-data-panel .cmux-panel-footer { flex-wrap: wrap; }
+.wimux-wide-data-body { overflow: auto; padding: 8px 0; }
+.wimux-wide-data-panel .wimux-grid { min-width: 920px; }
+.wimux-command-logs-panel .wimux-grid { min-width: 1120px; }
+.wimux-wide-data-panel .wimux-panel-footer { flex-wrap: wrap; }
 
 /* Workspace settings are form-like and should fit narrow dock columns. */
-.cmux-workspace-settings .cmux-panel-body { overflow-x: hidden; }
-.cmux-workspace-settings textarea { max-width: 100%; }
-.cmux-ssh-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.cmux-ssh-card {
+.wimux-workspace-settings .wimux-panel-body { overflow-x: hidden; }
+.wimux-workspace-settings textarea { max-width: 100%; }
+.wimux-ssh-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.wimux-ssh-card {
   position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -910,36 +913,36 @@ select.set-input { cursor: pointer; }
   border-radius: 6px;
   min-width: 0;
 }
-.cmux-ssh-card input { width: 100%; min-width: 0; }
-.cmux-ssh-identity, .cmux-ssh-preview { grid-column: 1 / -1; }
-.cmux-ssh-preview { overflow-wrap: anywhere; font-size: 11px; }
-.cmux-ssh-remove { position: absolute; top: 8px; right: 8px; }
+.wimux-ssh-card input { width: 100%; min-width: 0; }
+.wimux-ssh-identity, .wimux-ssh-preview { grid-column: 1 / -1; }
+.wimux-ssh-preview { overflow-wrap: anywhere; font-size: 11px; }
+.wimux-ssh-remove { position: absolute; top: 8px; right: 8px; }
 
-/* ── Generic form elements (scoped to cmux panels, not dockview) ── */
-.cmux-panel input, .cmux-panel select, .cmux-panel textarea,
-.set-input, .cmux-chat-search, .write-popup-input, .cmux-agent-textarea,
-.tab-search input, .ws-search input, .cmux-chat-input textarea,
+/* ── Generic form elements (scoped to wimux panels, not dockview) ── */
+.wimux-panel input, .wimux-panel select, .wimux-panel textarea,
+.set-input, .wimux-chat-search, .write-popup-input, .wimux-agent-textarea,
+.tab-search input, .ws-search input, .wimux-chat-input textarea,
 textarea, input[type="text"], input[type="number"], input[type="password"], select {
   background: var(--bg); border: 1px solid var(--border); color: var(--text);
   border-radius: 4px; padding: 7px 10px; font-size: 13px; outline: none;
 }
-.cmux-panel input:focus, .cmux-panel select:focus, .cmux-panel textarea:focus,
+.wimux-panel input:focus, .wimux-panel select:focus, .wimux-panel textarea:focus,
 .set-input:focus, textarea:focus, input[type="text"]:focus,
 input[type="number"]:focus, input[type="password"]:focus, select:focus { border-color: var(--accent); }
-.cmux-agent-chat .cmux-agent-textarea {
+.wimux-agent-chat .wimux-agent-textarea {
   border: 0;
   background: transparent;
   border-radius: 0;
   padding: 10px 10px 0;
 }
-.cmux-agent-chat .cmux-agent-textarea:focus { border: 0; }
-.cmux-agent-chat .cmux-chat-search {
+.wimux-agent-chat .wimux-agent-textarea:focus { border: 0; }
+.wimux-agent-chat .wimux-chat-search {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 6px 8px;
 }
-.cmux-agent-chat .cmux-chat-search:focus { border-color: var(--accent); }
+.wimux-agent-chat .wimux-chat-search:focus { border-color: var(--accent); }
 .toolbar .tab-search input,
 .toolbar .tab-search input:focus {
   height: 100%;
@@ -947,14 +950,14 @@ input[type="number"]:focus, input[type="password"]:focus, select:focus { border-
   background: transparent;
   padding: 0 4px;
 }
-.cmux-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
-.cmux-field > span { color: var(--text-dim); }
-.cmux-field.full { grid-column: 1 / -1; }
-.cmux-field.checkbox { flex-direction: row; align-items: center; gap: 8px; }
-.cmux-field.checkbox input { width: auto; }
-.cmux-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
-.cmux-settings-grid .cmux-section { grid-column: 1 / -1; margin: 8px 0 0; font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.6px; }
-.cmux-badge { background: var(--danger); color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 6px; }
+.wimux-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.wimux-field > span { color: var(--text-dim); }
+.wimux-field.full { grid-column: 1 / -1; }
+.wimux-field.checkbox { flex-direction: row; align-items: center; gap: 8px; }
+.wimux-field.checkbox input { width: auto; }
+.wimux-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+.wimux-settings-grid .wimux-section { grid-column: 1 / -1; margin: 8px 0 0; font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.6px; }
+.wimux-badge { background: var(--danger); color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 6px; }
 
 /* ── Markdown ── */
 .md p { margin: 0 0 6px; }
@@ -970,24 +973,24 @@ input[type="number"]:focus, input[type="password"]:focus, select:focus { border-
 .checkbox { display: flex; align-items: center; gap: 8px; }
 
 /* ── Modal (for WorkspaceSettingsPanel docked usage) ── */
-.cmux-modal { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
-.cmux-modal-head { height: 44px; flex-shrink: 0; display: flex; align-items: center; padding: 0 18px; font-size: 14px; font-weight: 600; border-bottom: 1px solid var(--border); background: var(--bg-alt); }
-.cmux-modal-body { flex: 1; display: flex; min-height: 0; }
-.cmux-modal-toolbar { display: flex; gap: 6px; padding: 6px 18px; background: var(--bg-alt); border-bottom: 1px solid var(--border); }
-.docked-panel .cmux-modal-toolbar { padding: 8px 12px; flex-shrink: 0; }
-.cmux-modal-toolbar button { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
-.cmux-modal-toolbar button.primary, .cmux-modal-toolbar button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.cmux-modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 18px; border-top: 1px solid var(--border); background: var(--bg-alt); }
-.docked-panel .cmux-modal-actions { margin: 10px -10px -10px; padding: 10px 12px; }
-.cmux-modal-actions button { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 8px 16px; cursor: pointer; }
-.cmux-modal-actions button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.wimux-modal { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
+.wimux-modal-head { height: 44px; flex-shrink: 0; display: flex; align-items: center; padding: 0 18px; font-size: 14px; font-weight: 600; border-bottom: 1px solid var(--border); background: var(--bg-alt); }
+.wimux-modal-body { flex: 1; display: flex; min-height: 0; }
+.wimux-modal-toolbar { display: flex; gap: 6px; padding: 6px 18px; background: var(--bg-alt); border-bottom: 1px solid var(--border); }
+.docked-panel .wimux-modal-toolbar { padding: 8px 12px; flex-shrink: 0; }
+.wimux-modal-toolbar button { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.wimux-modal-toolbar button.primary, .wimux-modal-toolbar button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.wimux-modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 18px; border-top: 1px solid var(--border); background: var(--bg-alt); }
+.docked-panel .wimux-modal-actions { margin: 10px -10px -10px; padding: 10px 12px; }
+.wimux-modal-actions button { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 8px 16px; cursor: pointer; }
+.wimux-modal-actions button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* ── Remaining component classes ── */
-.cmux-chat-input { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); align-items: flex-end; background: var(--bg-alt); flex-shrink: 0; }
-.cmux-chat-input textarea { flex: 1; resize: none; min-height: 56px; max-height: 120px; min-width: 0; }
-.cmux-send-btn { width: 32px; height: 32px; border-radius: 16px; border: none; background: var(--accent); color: #fff; cursor: pointer; font-size: 13px; display: grid; place-items: center; padding: 0; flex-shrink: 0; }
-.cmux-send-btn:disabled { opacity: 0.4; cursor: default; }
-.cmux-status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.wimux-chat-input { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); align-items: flex-end; background: var(--bg-alt); flex-shrink: 0; }
+.wimux-chat-input textarea { flex: 1; resize: none; min-height: 56px; max-height: 120px; min-width: 0; }
+.wimux-send-btn { width: 32px; height: 32px; border-radius: 16px; border: none; background: var(--accent); color: #fff; cursor: pointer; font-size: 13px; display: grid; place-items: center; padding: 0; flex-shrink: 0; }
+.wimux-send-btn:disabled { opacity: 0.4; cursor: default; }
+.wimux-status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .status-panes { color: var(--text-dim); }
 .status-local { color: var(--text-dim); }
 .wide { width: min(960px, 94vw) !important; }

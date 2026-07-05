@@ -1,34 +1,34 @@
-# cmux3
+# wimux
 
-Web port of cmux-windows. The native WPF desktop app is replaced by a
-browser-based UI, while the proven ConPTY terminal engine (`Cmux.Core`) is
+Web port of wimux-windows. The native WPF desktop app is replaced by a
+browser-based UI, while the proven ConPTY terminal engine (`Wimux.Core`) is
 reused unchanged on the server.
 
 ## Architecture
 
 ```text
-cmux3/
+wimux/
   server/
-    Cmux.Core/   reused terminal engine (ConPTY + VT parser + buffer + OSC)
-    Cmux.Web/    ASP.NET Core host: REST API + terminal WebSocket relay + static SPA
+    Wimux.Core/   reused terminal engine (ConPTY + VT parser + buffer + OSC)
+    Wimux.Web/    ASP.NET Core host: REST API + terminal WebSocket relay + static SPA
   web/           React + TypeScript + xterm.js frontend (Vite)
 ```
 
 - The browser renders terminals with xterm.js.
-- Keystrokes travel over a WebSocket to `Cmux.Web`, which feeds them to a
+- Keystrokes travel over a WebSocket to `Wimux.Web`, which feeds them to a
   real ConPTY-backed `TerminalSession` on Windows.
 - Raw shell output streams back over the same socket; recent output is
   buffered server-side so a page refresh replays the screen.
 - Workspaces, surfaces (tabs) and split-pane layouts are stored as JSON in
-  `%LOCALAPPDATA%\cmux3\state.json`.
+  `%LOCALAPPDATA%\wimux\state.json`.
 
-## Launcher (`cmux3`)
+## Launcher (`wimux`)
 
-The fastest way in: run `cmux3` from any terminal (PowerShell, Windows Terminal,
+The fastest way in: run `wimux` from any terminal (PowerShell, Windows Terminal,
 cmd) to open an interactive launcher menu — pick an interface and go.
 
 ```text
-   c m u x 3
+   w i m u x
 
   +----------------------------------------------------------------+
   | Terminal workspaces in your browser                            |
@@ -44,7 +44,7 @@ cmd) to open an interactive launcher menu — pick an interface and go.
 
 - Move with the arrow keys (or `j`/`k`), select with `Enter`, or press `1`-`6`.
 - Web UI starts the host if needed and opens `http://localhost:5201`.
-- Run in Background hides cmux3 to the system tray with the server still up.
+- Run in Background hides wimux to the system tray with the server still up.
 - The launcher checks GitHub for newer releases in the background.
 
 ### Install
@@ -53,24 +53,24 @@ Install (or update) with one line in PowerShell — no .NET or Node needed,
 it downloads a self-contained build from the latest GitHub release:
 
 ```powershell
-irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/cmux3/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
 ```
 
-This drops cmux3 into `%LOCALAPPDATA%\Programs\cmux3` and adds it to your PATH.
-Pin a version with `$env:CMUX_VERSION="v0.1.0"` before running.
+This drops wimux into `%LOCALAPPDATA%\Programs\wimux` and adds it to your PATH.
+Pin a version with `$env:WIMUX_VERSION="v0.1.0"` before running.
 
 Building from a source checkout instead? Run `./install.ps1` from the repo root
 (needs the .NET SDK + Node).
 
-Then open a new terminal and run `cmux3`. Non-interactive shortcuts are also
+Then open a new terminal and run `wimux`. Non-interactive shortcuts are also
 available for scripting:
 
 ```powershell
-cmux3 web       # start host (if needed) + open browser
-cmux3 start     # start host in the background
-cmux3 stop      # stop the background host
-cmux3 status    # running / stopped
-cmux3 cli       # interactive cmux command console
+wimux web       # start host (if needed) + open browser
+wimux start     # start host in the background
+wimux stop      # stop the background host
+wimux status    # running / stopped
+wimux cli       # interactive wimux command console
 ```
 
 ## Requirements
@@ -84,7 +84,7 @@ cmux3 cli       # interactive cmux command console
 Run the backend (terminal host + API) on port 5201:
 
 ```powershell
-cd server/Cmux.Web
+cd server/Wimux.Web
 dotnet run --urls http://localhost:5201
 ```
 
@@ -105,7 +105,7 @@ Build the SPA into the backend's `wwwroot`, then run the single web host:
 ```powershell
 cd web
 npm run build
-cd ../server/Cmux.Web
+cd ../server/Wimux.Web
 dotnet run --urls http://localhost:5201
 ```
 
@@ -136,7 +136,7 @@ one process.
 - Workspace templates + git branch/remote + listening-port detection APIs
 - Workspace shortcuts: jump `Ctrl+1..9`, rename `Ctrl+Shift+R`, close `Ctrl+Shift+W`
 - Surface cycling — `Ctrl+Shift+]` / `Ctrl+Shift+[`
-- `cmux` CLI (HTTP) for automation: `notify`, `workspace`, `surface`, `split`, `status`
+- `wimux-cli` CLI (HTTP) for automation: `notify`, `workspace`, `surface`, `split`, `status`
 - Web and notepad pane types alongside terminals (per-pane type switcher) — auto-saved notes
 - External AI agent detection + conversation viewer (Claude/Codex/Gemini/etc.) — `Ctrl+Shift+A`
 - Per-workspace environment variables (injected into new terminals) + SSH profiles — `Ctrl+Shift+E`
@@ -148,7 +148,7 @@ one process.
 - Pane focus navigation (`Ctrl+Alt+Arrow`) and zoom (`Ctrl+Shift+Z`)
 - Workspace templates browser — `Ctrl+Shift+T`
 - Built-in AI agent runtime (OpenAI/Anthropic/Gemini-compatible) with streaming chat — `Ctrl+Shift+J`
-- Agent settings (provider, model, API key, system prompt, tools) and the agent `cmux` tool bridge
+- Agent settings (provider, model, API key, system prompt, tools) and the agent `wimux` tool bridge
 - Agent conversation thread store with markdown-rendered messages
 - Full settings (appearance/terminal/behavior) with JSON export/import
 - UI themes: Dark+ / Light / High Contrast
@@ -160,11 +160,11 @@ one process.
 
 ## CLI
 
-The `cmux` CLI talks to the running web host over HTTP (default
-`http://localhost:5201`, override with `CMUX_URL`).
+The `wimux-cli` CLI talks to the running web host over HTTP (default
+`http://localhost:5201`, override with `WIMUX_URL`).
 
 ```powershell
-cd server/Cmux.Cli
+cd server/Wimux.Cli
 dotnet run -- status
 dotnet run -- notify --title "Claude Code" --body "Waiting for input"
 dotnet run -- workspace list
