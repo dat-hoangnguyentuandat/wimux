@@ -161,6 +161,40 @@ public class TerminalE2ETests : IClassFixture<RealServerFixture>
         actualHex.Should().Be(Convert.ToHexString(Encoding.UTF8.GetBytes(text)).ToLowerInvariant());
     }
 
+    [Fact]
+    public async Task RawModeCli_ImeReplacementSequenceKeepsPreviousText()
+    {
+        var paneId = "rt-ime-replace-" + Guid.NewGuid().ToString("N");
+        var js = "process.stdin.setRawMode(true);process.stdin.resume();let b=[];process.stdin.on('data',d=>{for(const x of d){if(x===13){const buf=Buffer.from(b);console.log('RAWTEXT='+buf.toString('utf8'));console.log('RAWHEX='+buf.toString('hex'));process.exit(0);}else if(x===8||x===127){b.pop();}else b.push(x);}});";
+        var shell = "node -e \"" + js + "\"";
+        var uri = new Uri($"{_fx.BaseWs}/ws/terminal/{paneId}?cols=80&rows=24&shell={Uri.EscapeDataString(shell)}");
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(uri, CancellationToken.None);
+
+        await SendInputAsync(ws, "go\x7fõ\r");
+        var output = await ReadUntilAsync(ws, "RAWHEX=", TimeSpan.FromSeconds(20));
+
+        output.Should().Contain("RAWTEXT=gõ");
+        output.Should().Contain("RAWHEX=" + Convert.ToHexString(Encoding.UTF8.GetBytes("gõ")).ToLowerInvariant());
+    }
+
+    [Fact]
+    public async Task RawModeCli_ImeReplacementSequenceHandlesVietnameseDStroke()
+    {
+        var paneId = "rt-ime-dstroke-" + Guid.NewGuid().ToString("N");
+        var js = "process.stdin.setRawMode(true);process.stdin.resume();let b=[];process.stdin.on('data',d=>{for(const x of d){if(x===13){const buf=Buffer.from(b);console.log('RAWTEXT='+buf.toString('utf8'));console.log('RAWHEX='+buf.toString('hex'));process.exit(0);}else if(x===8||x===127){b.pop();}else b.push(x);}});";
+        var shell = "node -e \"" + js + "\"";
+        var uri = new Uri($"{_fx.BaseWs}/ws/terminal/{paneId}?cols=80&rows=24&shell={Uri.EscapeDataString(shell)}");
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(uri, CancellationToken.None);
+
+        await SendInputAsync(ws, "ad\x7fđ\r");
+        var output = await ReadUntilAsync(ws, "RAWHEX=", TimeSpan.FromSeconds(20));
+
+        output.Should().Contain("RAWTEXT=ađ");
+        output.Should().Contain("RAWHEX=" + Convert.ToHexString(Encoding.UTF8.GetBytes("ađ")).ToLowerInvariant());
+    }
+
     // ── helpers ─────────────────────────────────────────────
     // NOTE: cancelling ReceiveAsync with a per-iteration token aborts a .NET
     // ClientWebSocket, so we use one overall deadline token and a background

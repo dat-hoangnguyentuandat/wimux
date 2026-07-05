@@ -71,6 +71,9 @@ public class AppStateDto
 /// </summary>
 public sealed class AppStateStore
 {
+    public const string DefaultWorkspaceNamePrefix = "Workspace";
+    public const string DefaultTerminalNamePrefix = "Terminal";
+
     private static string Dir =>
         Environment.GetEnvironmentVariable("WIMUX_STATE_DIR")
         ?? Environment.GetEnvironmentVariable("WIMUX3_STATE_DIR")
@@ -99,14 +102,14 @@ public sealed class AppStateStore
         var pane = new PaneDto { Type = "terminal" };
         var surface = new SurfaceDto
         {
-            Name = "Terminal",
+            Name = $"{DefaultTerminalNamePrefix} 1",
             Root = new SplitNodeDto { IsLeaf = true, PaneId = pane.Id },
             FocusedPaneId = pane.Id,
             Panes = { [pane.Id] = pane },
         };
         var ws = new WorkspaceDto
         {
-            Name = "Default",
+            Name = $"{DefaultWorkspaceNamePrefix} 1",
             Surfaces = { surface },
             SelectedSurfaceId = surface.Id,
         };
@@ -123,11 +126,124 @@ public sealed class AppStateStore
             {
                 var json = File.ReadAllText(FilePath);
                 var state = JsonSerializer.Deserialize<AppStateDto>(json, JsonOpts);
-                if (state != null) return state;
+                if (state != null)
+                {
+                    NormalizeState(state);
+                    return state;
+                }
             }
         }
         catch { /* fall through to fresh state */ }
         return new AppStateDto();
+    }
+
+    public static string NextNumberedName(IEnumerable<string> usedNames, string prefix)
+    {
+        var used = new HashSet<string>(usedNames.Where(n => !string.IsNullOrWhiteSpace(n)), StringComparer.OrdinalIgnoreCase);
+        for (var i = 1; ; i++)
+        {
+            var name = $"{prefix} {i}";
+            if (!used.Contains(name)) return name;
+        }
+    }
+
+    public static string NextUniqueName(IEnumerable<string> usedNames, string baseName)
+    {
+        var used = new HashSet<string>(usedNames.Where(n => !string.IsNullOrWhiteSpace(n)), StringComparer.OrdinalIgnoreCase);
+        if (!used.Contains(baseName)) return baseName;
+        for (var i = 2; ; i++)
+        {
+            var name = $"{baseName} {i}";
+            if (!used.Contains(name)) return name;
+        }
+    }
+
+    public static void NormalizeState(AppStateDto state)
+    {
+        if (state.Workspaces.Count == 0)
+        {
+            state.SelectedWorkspaceId = null;
+            return;
+        }
+
+        var workspaceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var ws in state.Workspaces)
+        {
+            if (string.IsNullOrWhiteSpace(ws.Name) ||
+                string.Equals(ws.Name, "Default", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ws.Name, DefaultWorkspaceNamePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                ws.Name = NextNumberedName(workspaceNames, DefaultWorkspaceNamePrefix);
+            }
+            workspaceNames.Add(ws.Name);
+
+            NormalizeWorkspace(ws);
+        }
+
+        if (string.IsNullOrWhiteSpace(state.SelectedWorkspaceId) ||
+            state.Workspaces.All(w => w.Id != state.SelectedWorkspaceId))
+        {
+            state.SelectedWorkspaceId = state.Workspaces.FirstOrDefault()?.Id;
+        }
+    }
+
+    private static void NormalizeWorkspace(WorkspaceDto ws)
+    {
+        var surfaceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var surface in ws.Surfaces)
+        {
+            if (string.IsNullOrWhiteSpace(surface.Name) ||
+                string.Equals(surface.Name, DefaultTerminalNamePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                surface.Name = NextNumberedName(surfaceNames, DefaultTerminalNamePrefix);
+            }
+            surfaceNames.Add(surface.Name);
+            NormalizeSurface(surface);
+        }
+
+        if (string.IsNullOrWhiteSpace(ws.SelectedSurfaceId) ||
+            ws.Surfaces.All(s => s.Id != ws.SelectedSurfaceId))
+        {
+            ws.SelectedSurfaceId = ws.Surfaces.FirstOrDefault()?.Id;
+        }
+    }
+
+    private static void NormalizeSurface(SurfaceDto surface)
+    {
+        var normalizedRoot = NormalizeNode(surface.Root, surface.Panes.Keys.ToHashSet(StringComparer.Ordinal));
+        surface.Root = normalizedRoot ?? new SplitNodeDto { IsLeaf = true };
+
+        var reachable = SplitTreeOps.AllPanes(surface.Root).ToHashSet(StringComparer.Ordinal);
+        foreach (var paneId in surface.Panes.Keys.Where(k => !reachable.Contains(k)).ToList())
+            surface.Panes.Remove(paneId);
+
+        if (surface.FocusedPaneId == null || !surface.Panes.ContainsKey(surface.FocusedPaneId))
+            surface.FocusedPaneId = SplitTreeOps.FirstLeafPane(surface.Root);
+    }
+
+    private static SplitNodeDto? NormalizeNode(SplitNodeDto? node, ISet<string> paneIds)
+    {
+        if (node == null) return null;
+        if (node.IsLeaf)
+        {
+            node.First = null;
+            node.Second = null;
+            if (node.PaneId != null && paneIds.Contains(node.PaneId)) return node;
+            node.PaneId = null;
+            return null;
+        }
+
+        var first = NormalizeNode(node.First, paneIds);
+        var second = NormalizeNode(node.Second, paneIds);
+        if (first == null && second == null) return null;
+        if (first == null) return second;
+        if (second == null) return first;
+
+        node.IsLeaf = false;
+        node.PaneId = null;
+        node.First = first;
+        node.Second = second;
+        return node;
     }
 
     public void Save()

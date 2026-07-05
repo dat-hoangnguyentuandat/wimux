@@ -12,7 +12,7 @@ namespace Wimux.Launcher;
 /// </summary>
 internal static class Program
 {
-    internal const string CurrentVersion = "0.1.3";
+    internal const string CurrentVersion = "0.1.4";
 
     [STAThread]
     private static int Main(string[] args)
@@ -54,6 +54,8 @@ internal static class Program
             case "codex":
                 ServerManager.EnsureRunning();
                 return CodexLauncher.Open(args.Skip(1).ToArray());
+            case "update":
+                return RunUpdate();
             case "-v":
             case "--version":
             case "version":
@@ -84,8 +86,27 @@ internal static class Program
               wimux status       Show whether the host is running
               wimux cli          Open the interactive CLI
               wimux codex [args] Open a wimux web terminal running `codex`
+              wimux update       Install the latest GitHub release if newer
               wimux version      Print version
             """);
+    }
+
+    private static int RunUpdate()
+    {
+        Console.WriteLine("Checking for updates...");
+        var result = UpdateChecker.InstallLatest();
+        if (result.UpToDate)
+        {
+            Console.WriteLine($"You are on the latest version (v{Program.CurrentVersion}).");
+            return 0;
+        }
+        if (!result.Started)
+        {
+            Console.Error.WriteLine($"Update failed: {result.Error}");
+            return 1;
+        }
+        Console.WriteLine($"Updating to v{result.Version}. The launcher will close and reopen when done.");
+        return 0;
     }
 }
 

@@ -59,16 +59,14 @@ app.MapGet("/api/state", (AppStateStore store) => Results.Json(store.State, json
 
 app.MapPost("/api/workspaces", (AppStateStore store, CreateWorkspaceReq req) =>
 {
-    var baseName = string.IsNullOrWhiteSpace(req.Name) ? "Workspace" : req.Name.Trim();
-    var usedNames = new HashSet<string>(store.State.Workspaces.Select(w => w.Name), StringComparer.OrdinalIgnoreCase);
-    var name = baseName;
-    for (var i = 2; usedNames.Contains(name); i++)
-        name = $"{baseName} {i}";
+    var name = string.IsNullOrWhiteSpace(req.Name)
+        ? AppStateStore.NextNumberedName(store.State.Workspaces.Select(w => w.Name), AppStateStore.DefaultWorkspaceNamePrefix)
+        : AppStateStore.NextUniqueName(store.State.Workspaces.Select(w => w.Name), req.Name.Trim());
 
     var pane = new PaneDto { Type = "terminal" };
     var surface = new SurfaceDto
     {
-        Name = "Terminal",
+        Name = $"{AppStateStore.DefaultTerminalNamePrefix} 1",
         Root = new SplitNodeDto { IsLeaf = true, PaneId = pane.Id },
         FocusedPaneId = pane.Id,
         Panes = { [pane.Id] = pane },
@@ -133,12 +131,11 @@ app.MapPost("/api/workspaces/{wsId}/surfaces", (AppStateStore store, string wsId
         Url = paneType == "web" ? req?.Url : null,
         Title = paneType == "web" ? "Browser" : null,
     };
-    var baseName = string.IsNullOrWhiteSpace(req?.Name) ? (paneType == "web" ? "Browser" : "Terminal") : req!.Name;
-    // Auto-number to avoid duplicate surface names (matching wimux2).
-    var usedNames = new HashSet<string>(ws.Surfaces.Select(s => s.Name));
-    var name = baseName;
-    for (int i = 2; usedNames.Contains(name); i++)
-        name = $"{baseName} {i}";
+    var name = string.IsNullOrWhiteSpace(req?.Name)
+        ? paneType == "web"
+            ? AppStateStore.NextNumberedName(ws.Surfaces.Select(s => s.Name), "Browser")
+            : AppStateStore.NextNumberedName(ws.Surfaces.Select(s => s.Name), AppStateStore.DefaultTerminalNamePrefix)
+        : AppStateStore.NextUniqueName(ws.Surfaces.Select(s => s.Name), req!.Name.Trim());
     var surface = new SurfaceDto
     {
         Name = name,

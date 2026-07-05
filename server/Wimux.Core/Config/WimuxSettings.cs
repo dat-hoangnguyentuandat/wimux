@@ -48,7 +48,7 @@ public class WimuxSettings
     public bool ConfirmOnClose { get; set; } = true;
     public bool AutoCopyOnSelect { get; set; } = false;
     public bool CtrlClickOpensUrls { get; set; } = true;
-    public bool QuickWriteEnabled { get; set; } = true;
+    public bool QuickWriteEnabled { get; set; } = false;
     // Default (false): in plain shells (pwsh/cmd, no DEC mouse tracking) a
     // right-click opens wimux's context menu; inside mouse-tracking TUI apps
     // (claude-code / codex / cline) a plain right-click is forwarded to the TUI

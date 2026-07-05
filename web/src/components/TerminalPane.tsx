@@ -146,6 +146,26 @@ function toXtermTheme(t?: TerminalTheme, custom?: CustomColors) {
   };
 }
 
+function isCompositionInput(ev: InputEvent) {
+  return ev.isComposing ||
+    ev.inputType.toLowerCase().includes("composition") ||
+    ev.inputType === "insertFromComposition" ||
+    ev.inputType === "insertReplacementText";
+}
+
+function lastCodePoint(text: string) {
+  const chars = Array.from(text);
+  return chars.length ? chars[chars.length - 1] : "";
+}
+
+function baseLetter(text: string) {
+  return lastCodePoint(text)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase();
+}
+
 export function TerminalPane(props: Props) {
   const { paneId, cwd, focused, theme, fontFamily, fontSize, customColors } = props;
   const paneRef = useRef<HTMLDivElement>(null);
@@ -179,7 +199,7 @@ export function TerminalPane(props: Props) {
   // current mouse-tracking mode and the RightClickAlwaysMenu setting.
   const mouseTrackingRef = useRef(false);
   const rightClickAlwaysMenuRef = useRef(false);
-  const quickWriteEnabledRef = useRef(true);
+  const quickWriteEnabledRef = useRef(false);
   const lastTypeablePointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
 
   // Default to the legacy behaviour (TUI apps keep their own right-click =
@@ -191,7 +211,7 @@ export function TerminalPane(props: Props) {
   }, [props.settings]);
 
   useEffect(() => {
-    const enabled = props.settings?.quickWriteEnabled !== false;
+    const enabled = props.settings?.quickWriteEnabled === true;
     quickWriteEnabledRef.current = enabled;
     if (!enabled) {
       setAnchorPos(null);
@@ -374,25 +394,76 @@ export function TerminalPane(props: Props) {
       }
     };
 
+    let lastPrintableInput = "";
+    let lastPrintableInputAt = 0;
+    const rememberPrintableInput = (text: string) => {
+      const ch = lastCodePoint(text);
+      if (ch && !/[\x00-\x1f\x7f]/.test(ch)) {
+        lastPrintableInput = ch;
+        lastPrintableInputAt = Date.now();
+      } else if (/[\r\n\x03\x7f\b]/.test(text)) {
+        lastPrintableInput = "";
+        lastPrintableInputAt = 0;
+      }
+    };
     const sendTerminalInput = (text: string) => {
       if (!text) return;
       if (ws.readyState === WebSocket.OPEN) ws.send("i" + enc(text));
       terminalBus.broadcastFrom(paneId, text);
+      rememberPrintableInput(text);
     };
 
-    // Forward every xterm `onData` chunk straight to the server. xterm.js
-    // owns the hidden textarea and already binds keypress + IME composition
-    // (Windows TSF on Edge/Chrome will commit precomposed Vietnamese runes
-    // to the hidden textarea; xterm surfaces them as onData strings).
-    // We deliberately do NOT add our own textarea or composition listeners:
-    // doing so double-sent every keystroke (the original "duplicate" bug
-    // when typing into codex). We also do NOT run a JS-side Telex/VNI
-    // composer — raw keystroke interception fights the OS IME and produces
-    // the wrong bytes for xterm's composition surface. The OS TSF IME
-    // already emits the right "\b<composed>" sequence, and the server's
-    // ConPTY forwards it verbatim. This matches the wimux2 (WPF) behavior
-    // of trusting the host's text input.
-    term.onData((data) => { sendTerminalInput(data); });
+    let pendingDeadKeyMarker = false;
+    let pendingDeadKeyTimer: number | undefined;
+    const clearPendingDeadKeyTimer = () => {
+      if (pendingDeadKeyTimer !== undefined) {
+        window.clearTimeout(pendingDeadKeyTimer);
+        pendingDeadKeyTimer = undefined;
+      }
+    };
+    const flushPendingDeadKeyMarker = () => {
+      if (!pendingDeadKeyMarker) return;
+      pendingDeadKeyMarker = false;
+      clearPendingDeadKeyTimer();
+      sendTerminalInput("·");
+    };
+    const holdDeadKeyMarker = () => {
+      pendingDeadKeyMarker = true;
+      clearPendingDeadKeyTimer();
+      pendingDeadKeyTimer = window.setTimeout(flushPendingDeadKeyMarker, 80);
+    };
+    const sendXtermData = (data: string) => {
+      let out = "";
+      for (const ch of Array.from(data)) {
+        if (pendingDeadKeyMarker) {
+          if (ch === "\x7f" || ch === "\b") {
+            pendingDeadKeyMarker = false;
+            clearPendingDeadKeyTimer();
+            continue;
+          }
+          flushPendingDeadKeyMarker();
+        }
+
+        if (ch === "·") {
+          if (out) {
+            sendTerminalInput(out);
+            out = "";
+          }
+          holdDeadKeyMarker();
+          continue;
+        }
+
+        out += ch;
+      }
+      if (out) sendTerminalInput(out);
+    };
+
+    // Forward regular terminal data from xterm. IME composition is handled by
+    // the capture-phase DOM listeners below; xterm's own composition helper can
+    // also emit a dead-key marker ("·") followed by DELs and replacement text.
+    // Codex's raw editor does not count that marker as inserted text, so we
+    // consume the marker and the first DEL that only erases the marker.
+    term.onData(sendXtermData);
 
     const unregister = terminalBus.register(paneId, {
       write: (text) => { if (ws.readyState === WebSocket.OPEN) ws.send("i" + enc(text)); },
@@ -463,6 +534,87 @@ export function TerminalPane(props: Props) {
     wrapperEl.addEventListener("mousedown", onRightMouseDown, { capture: true });
     wrapperEl.addEventListener("contextmenu", onContextMenu, { capture: true });
 
+    let imeComposing = false;
+    let imeCommitPending = false;
+    let compositionStartValue = "";
+    let lastCompositionData = "";
+    let compositionFallbackTimer: number | undefined;
+    const textarea = term.textarea;
+    const clearCompositionFallback = () => {
+      if (compositionFallbackTimer !== undefined) {
+        window.clearTimeout(compositionFallbackTimer);
+        compositionFallbackTimer = undefined;
+      }
+    };
+    const shouldReplaceRecentPrintable = (text: string) =>
+      !!text &&
+      !!lastPrintableInput &&
+      Date.now() - lastPrintableInputAt < 1500 &&
+      baseLetter(text) === baseLetter(lastPrintableInput);
+    const commitImeText = (text: string, replacePrevious = false) => {
+      if (!text) return;
+      sendTerminalInput(replacePrevious ? "\x7f" + text : text);
+      if (textarea) textarea.value = "";
+    };
+    const stopImeEvent = (e: Event) => {
+      e.stopPropagation();
+      if ("stopImmediatePropagation" in e) e.stopImmediatePropagation();
+    };
+    const onCompositionStart = (e: CompositionEvent) => {
+      imeComposing = true;
+      imeCommitPending = false;
+      lastCompositionData = "";
+      compositionStartValue = textarea?.value ?? "";
+      clearCompositionFallback();
+      stopImeEvent(e);
+    };
+    const onCompositionUpdate = (e: CompositionEvent) => {
+      lastCompositionData = e.data ?? "";
+      stopImeEvent(e);
+    };
+    const onCompositionEnd = (e: CompositionEvent) => {
+      imeComposing = false;
+      imeCommitPending = true;
+      lastCompositionData = e.data || lastCompositionData;
+      stopImeEvent(e);
+      clearCompositionFallback();
+      compositionFallbackTimer = window.setTimeout(() => {
+        if (!imeCommitPending) return;
+        imeCommitPending = false;
+        const current = textarea?.value ?? "";
+        const committed = current.startsWith(compositionStartValue)
+          ? current.slice(compositionStartValue.length)
+          : (lastCompositionData || current);
+        commitImeText(committed);
+      }, 0);
+    };
+    const onImeKeyEvent = (e: KeyboardEvent) => {
+      if (!imeComposing && e.keyCode !== 229 && e.key !== "Process") return;
+      stopImeEvent(e);
+    };
+    const onImeInput = (e: InputEvent) => {
+      if (!imeComposing && !imeCommitPending && !isCompositionInput(e)) return;
+      stopImeEvent(e);
+
+      if (imeComposing || e.isComposing) {
+        return;
+      }
+
+      clearCompositionFallback();
+      imeCommitPending = false;
+      const current = textarea?.value ?? "";
+      const committed = e.data ||
+        (current.startsWith(compositionStartValue) ? current.slice(compositionStartValue.length) : "") ||
+        lastCompositionData;
+      commitImeText(committed, e.inputType === "insertReplacementText" && shouldReplaceRecentPrintable(committed));
+    };
+    wrapperEl.addEventListener("compositionstart", onCompositionStart, { capture: true });
+    wrapperEl.addEventListener("compositionupdate", onCompositionUpdate, { capture: true });
+    wrapperEl.addEventListener("compositionend", onCompositionEnd, { capture: true });
+    wrapperEl.addEventListener("keydown", onImeKeyEvent, { capture: true });
+    wrapperEl.addEventListener("keypress", onImeKeyEvent, { capture: true });
+    wrapperEl.addEventListener("input", onImeInput, { capture: true });
+
     // Global click listener for quick-write anchoring.
     // Bypasses xterm event blocking by listening at document level.
     const onDocumentClick = (e: MouseEvent) => {
@@ -491,6 +643,14 @@ export function TerminalPane(props: Props) {
       ro.disconnect();
       wrapperEl.removeEventListener("mousedown", onRightMouseDown, { capture: true } as any);
       wrapperEl.removeEventListener("contextmenu", onContextMenu, { capture: true } as any);
+      clearPendingDeadKeyTimer();
+      clearCompositionFallback();
+      wrapperEl.removeEventListener("compositionstart", onCompositionStart, { capture: true } as any);
+      wrapperEl.removeEventListener("compositionupdate", onCompositionUpdate, { capture: true } as any);
+      wrapperEl.removeEventListener("compositionend", onCompositionEnd, { capture: true } as any);
+      wrapperEl.removeEventListener("keydown", onImeKeyEvent, { capture: true } as any);
+      wrapperEl.removeEventListener("keypress", onImeKeyEvent, { capture: true } as any);
+      wrapperEl.removeEventListener("input", onImeInput, { capture: true } as any);
       setAnchorPos(null);
       ws.close();
       term.dispose();
@@ -647,7 +807,7 @@ export function TerminalPane(props: Props) {
         }}
       >
         <div ref={containerRef} className="terminal-xterm-host" />
-        {props.settings?.quickWriteEnabled !== false && anchorPos && !writeOpen && !menu && (
+        {props.settings?.quickWriteEnabled === true && anchorPos && !writeOpen && !menu && (
           <button
             className="quick-write-button"
             style={{ left: anchorPos.x - 18, top: anchorPos.y - 36 }}

@@ -724,6 +724,14 @@ select.set-input { cursor: pointer; }
 .wimux-chat-msg-main { flex: 1; min-width: 0; }
 .wimux-chat-role { font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
 .wimux-chat-content { font-size: 13px; overflow-wrap: anywhere; }
+.wimux-chat-pending { display: inline-flex; align-items: center; gap: 4px; min-height: 18px; padding: 2px 0; }
+.wimux-chat-pending span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: 0.35; animation: wimux-chat-pulse 1s ease-in-out infinite; }
+.wimux-chat-pending span:nth-child(2) { animation-delay: 0.15s; }
+.wimux-chat-pending span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes wimux-chat-pulse {
+  0%, 80%, 100% { opacity: 0.35; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
+}
 .wimux-chat-meta { font-size: 10px; margin-top: 4px; min-height: 12px; }
 .wimux-chat-delete { flex-shrink: 0; opacity: 0.65; }
 .wimux-agent-input-wrap { margin: 0 10px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); overflow: visible; flex-shrink: 0; }
@@ -929,13 +937,13 @@ textarea, input[type="text"], input[type="number"], input[type="password"], sele
 .wimux-panel input:focus, .wimux-panel select:focus, .wimux-panel textarea:focus,
 .set-input:focus, textarea:focus, input[type="text"]:focus,
 input[type="number"]:focus, input[type="password"]:focus, select:focus { border-color: var(--accent); }
-.wimux-agent-chat .wimux-agent-textarea {
+.wimux-agent-input-wrap .wimux-agent-textarea {
   border: 0;
   background: transparent;
   border-radius: 0;
   padding: 10px 10px 0;
 }
-.wimux-agent-chat .wimux-agent-textarea:focus { border: 0; }
+.wimux-agent-input-wrap .wimux-agent-textarea:focus { border: 0; }
 .wimux-agent-chat .wimux-chat-search {
   background: var(--bg);
   border: 1px solid var(--border);

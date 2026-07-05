@@ -41,8 +41,10 @@ public class WebE2ETests : IDisposable
         var state = await Client().GetFromJsonAsync<JsonElement>("/api/state", J);
         state.GetProperty("workspaces").GetArrayLength().Should().BeGreaterThan(0);
         var ws = state.GetProperty("workspaces")[0];
+        ws.GetProperty("name").GetString().Should().Be("Workspace 1");
         ws.GetProperty("surfaces").GetArrayLength().Should().BeGreaterThan(0);
         var surface = ws.GetProperty("surfaces")[0];
+        surface.GetProperty("name").GetString().Should().Be("Terminal 1");
         surface.GetProperty("root").GetProperty("isLeaf").GetBoolean().Should().BeTrue();
         surface.GetProperty("panes").EnumerateObject().Count().Should().Be(1);
     }
@@ -81,6 +83,22 @@ public class WebE2ETests : IDisposable
         var state = await client.GetFromJsonAsync<JsonElement>("/api/state", J);
         state.GetProperty("workspaces").EnumerateArray()
             .Any(w => w.GetProperty("id").GetString() == id).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task WorkspaceAndSurface_DefaultNames_StartAtOne()
+    {
+        var client = Client();
+
+        var created = await (await client.PostAsJsonAsync("/api/workspaces", new { }, J))
+            .Content.ReadFromJsonAsync<JsonElement>(J);
+        created.GetProperty("name").GetString().Should().Be("Workspace 2");
+        created.GetProperty("surfaces")[0].GetProperty("name").GetString().Should().Be("Terminal 1");
+
+        var wsId = created.GetProperty("id").GetString()!;
+        var surface = await (await client.PostAsJsonAsync($"/api/workspaces/{wsId}/surfaces", new { }, J))
+            .Content.ReadFromJsonAsync<JsonElement>(J);
+        surface.GetProperty("name").GetString().Should().Be("Terminal 2");
     }
 
     [Fact]
@@ -128,6 +146,27 @@ public class WebE2ETests : IDisposable
             .Content.ReadFromJsonAsync<JsonElement>(J);
         afterClose.GetProperty("root").GetProperty("isLeaf").GetBoolean().Should().BeTrue();
         afterClose.GetProperty("panes").EnumerateObject().Count().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CloseLastPane_RemovesRootPaneReference()
+    {
+        var client = Client();
+        var state = await client.GetFromJsonAsync<JsonElement>("/api/state", J);
+        var ws = state.GetProperty("workspaces")[0];
+        var wsId = ws.GetProperty("id").GetString()!;
+        var surface = ws.GetProperty("surfaces")[0];
+        var sId = surface.GetProperty("id").GetString()!;
+        var paneId = surface.GetProperty("focusedPaneId").GetString()!;
+
+        var afterClose = await (await client.DeleteAsync(
+            $"/api/workspaces/{wsId}/surfaces/{sId}/panes/{paneId}"))
+            .Content.ReadFromJsonAsync<JsonElement>(J);
+
+        afterClose.GetProperty("root").GetProperty("isLeaf").GetBoolean().Should().BeTrue();
+        afterClose.GetProperty("root").GetProperty("paneId").ValueKind.Should().Be(JsonValueKind.Null);
+        afterClose.GetProperty("panes").EnumerateObject().Should().BeEmpty();
+        afterClose.GetProperty("focusedPaneId").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]

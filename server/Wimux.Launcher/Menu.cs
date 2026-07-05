@@ -233,9 +233,32 @@ internal sealed class Menu
         Console.WriteLine("Checking for updates...");
         var latest = UpdateChecker.CheckForUpdate();
         if (latest != null)
-            Pause($"Update available: v{latest}. You have v{Program.CurrentVersion}.");
-        else
-            Pause($"You are on the latest version (v{Program.CurrentVersion}).");
+        {
+            Console.WriteLine($"Update available: v{latest}. You have v{Program.CurrentVersion}.");
+            Console.Write("Install now? [Y/n] ");
+            var key = Console.ReadKey(intercept: true);
+            Console.WriteLine();
+            if (key.Key is ConsoleKey.N or ConsoleKey.Escape)
+            {
+                Pause("Update skipped.");
+                return true;
+            }
+
+            Console.WriteLine("Downloading and preparing update...");
+            var result = UpdateChecker.InstallLatest();
+            if (result.Started)
+            {
+                Console.WriteLine($"Updating to v{result.Version}. This launcher will close and reopen when done.");
+                Thread.Sleep(1200);
+                return false;
+            }
+            Pause(result.UpToDate
+                ? $"You are on the latest version (v{Program.CurrentVersion})."
+                : $"Update failed: {result.Error}");
+            return true;
+        }
+
+        Pause($"You are on the latest version (v{Program.CurrentVersion}).");
         return true;
     }
 

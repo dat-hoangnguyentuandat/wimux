@@ -38,6 +38,7 @@ public static class SplitTreeOps
         if (surface.Root.IsLeaf && surface.Root.PaneId == paneId)
         {
             surface.Panes.Remove(paneId);
+            surface.Root.PaneId = null;
             return null; // surface becomes empty
         }
 

@@ -32,6 +32,8 @@ interface Props {
   onClose: () => void;
 }
 
+const PendingAssistantContent = "__wimux_pending_assistant__";
+
 export function AgentChatPanel({ workspaceId, surfaceId, paneId, onClose }: Props) {
   const dialog = useAppDialog();
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -301,7 +303,7 @@ export function AgentChatPanel({ workspaceId, surfaceId, paneId, onClose }: Prop
 
     const now = new Date().toISOString();
     appendMessage({ id: `optimistic-user-${threadId}-${Date.now()}`, threadId, role: "user", content: prompt, createdAtUtc: now });
-    setMessages((m) => upsertStreamingMessage(m, threadId!, undefined, "..."));
+    setMessages((m) => upsertStreamingMessage(m, threadId!, undefined, PendingAssistantContent));
     setBusy(true);
     setStatus("Waiting for response...");
 
@@ -433,7 +435,15 @@ export function AgentChatPanel({ workspaceId, surfaceId, paneId, onClose }: Prop
           <div key={m.id} className={"wimux-chat-msg " + m.role}>
             <div className="wimux-chat-msg-main">
               <div className="wimux-chat-role">{messageHeader(m)}</div>
-              <div className="wimux-chat-content md" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} />
+              {isPendingAssistant(m) ? (
+                <div className="wimux-chat-content wimux-chat-pending" aria-label="Waiting for response">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              ) : (
+                <div className="wimux-chat-content md" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} />
+              )}
               <div className="wimux-chat-meta dim mono">{messageMeta(m)}</div>
             </div>
             <button className="wimux-icon-btn wimux-chat-delete" onClick={() => deleteMessage(m)} title="Delete this message"><TrashIcon /></button>
@@ -499,8 +509,12 @@ function upsertStreamingMessage(messages: Msg[], threadId: string, messageId: st
   const idx = messages.findIndex((m) => m.id === id || (m.id === `stream-${threadId}` && m.role === "assistant"));
   if (idx < 0) return [...messages, { id, threadId, role: "assistant", content: delta || "" }];
   const current = messages[idx];
-  const content = current.content === "..." ? (delta || "") : current.content + (delta || "");
+  const content = current.content === PendingAssistantContent ? (delta || "") : current.content + (delta || "");
   return [...messages.slice(0, idx), { ...current, id, content }, ...messages.slice(idx + 1)];
+}
+
+function isPendingAssistant(m: Msg) {
+  return m.role === "assistant" && m.content === PendingAssistantContent;
 }
 
 function updateTypeName(type: unknown) {

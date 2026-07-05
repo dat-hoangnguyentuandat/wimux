@@ -69,7 +69,7 @@ and adds that folder to your user `PATH`.
 Pin a release before running the installer:
 
 ```powershell
-$env:WIMUX_VERSION = "v0.1.3"
+$env:WIMUX_VERSION = "v0.1.4"
 irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
 ```
 

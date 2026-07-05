@@ -136,12 +136,12 @@ export function AgentsPanel({ onClose }: Props) {
   };
 
   const attachImage = async () => {
-    const picked = await api.chooseFile().catch(() => undefined);
+    const picked = await api.chooseFile(selected?.projectPath).catch(() => undefined);
     if (picked?.path) appendAttachment(picked.path);
   };
 
   const attachFile = async () => {
-    const picked = await api.chooseFile().catch(() => undefined);
+    const picked = await api.chooseFile(selected?.projectPath).catch(() => undefined);
     if (picked?.path) appendAttachment(picked.path);
   };
 
@@ -246,16 +246,27 @@ export function AgentsPanel({ onClose }: Props) {
               </div>
             ))}
           </div>
-          <div className="wimux-chat-input">
+          <div className="wimux-agent-input-wrap">
             <textarea
+              className="wimux-agent-textarea"
               placeholder="Send a follow-up to this agent's session…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
             />
-            <button className="wimux-icon-btn" onClick={attachImage} title="Attach image"><ImageIcon /></button>
-            <button className="wimux-icon-btn" onClick={attachFile} title="Attach file"><FileIcon /></button>
-            <button className="wimux-send-btn" onClick={() => send()} disabled={!selected || !input.trim()} title="Send (Enter)"><ArrowUpIcon /></button>
+            <div className="wimux-agent-input-bar">
+              <div className="wimux-provider-btn" title={selected?.summary || selected?.projectPath || selected?.name || "Agent"}>
+                <span className="wimux-provider-dot" />
+                <span className="wimux-provider-current">
+                  {selectedKeys.size > 1 ? `${selectedKeys.size} agents` : (selected ? `${selected.name} · ${selected.typeLabel}` : "Agent")}
+                </span>
+              </div>
+              <div className="wimux-agent-actions">
+                <button className="wimux-icon-btn" onClick={attachImage} title="Attach image"><ImageIcon /></button>
+                <button className="wimux-icon-btn" onClick={attachFile} title="Attach file"><FileIcon /></button>
+                <button className="wimux-agent-send" onClick={() => send()} disabled={!selected || !input.trim()} title="Send (Enter)"><ArrowUpIcon /></button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
