@@ -1,31 +1,87 @@
-# wimux
+# Wimux
 
-Web port of wimux-windows. The native WPF desktop app is replaced by a
-browser-based UI, while the proven ConPTY terminal engine (`Wimux.Core`) is
-reused unchanged on the server.
+A Windows terminal workspace for running coding agents beside terminals,
+browser panes, notifications, logs, and reusable project context.
 
-## Architecture
+Wimux gives you composable primitives instead of a prescriptive agent
+workflow: workspaces, surfaces, split panes, ConPTY terminals, live browser
+panes, command history, notification tracking, and an HTTP CLI that can automate
+the running app.
 
-```text
-wimux/
-  server/
-    Wimux.Core/   reused terminal engine (ConPTY + VT parser + buffer + OSC)
-    Wimux.Web/    ASP.NET Core host: REST API + terminal WebSocket relay + static SPA
-  web/           React + TypeScript + xterm.js frontend (Vite)
+## Highlights
+
+### Agent-Friendly Workspaces
+
+Create a workspace per project, keep multiple surfaces open inside it, and
+split each surface into terminal, browser, and notepad panes. The sidebar keeps
+project context visible with working directories, Git branch status, unread
+notifications, and active pane metadata.
+
+### Native Windows Terminals
+
+Terminal panes run through Windows ConPTY, so shells and terminal applications
+behave like they do in a normal Windows console. Recent output is buffered
+server-side and replayed when a browser reconnects or the UI refreshes.
+
+### Attention Signals
+
+Wimux listens for terminal notification escape sequences and manual
+notifications from the CLI. Unread state appears in the workspace/sidebar UI,
+and the notification panel gives you a single place to jump back to sessions
+that need input.
+
+### Live Browser Panes
+
+Split a real Edge or Chrome pane next to your terminal. Wimux launches a
+dedicated browser profile through the Chrome DevTools Protocol, streams the tab
+into the UI, and exposes browser state to the backend so agents can inspect and
+act on web work without leaving the workspace.
+
+### Built-In Agent Chat
+
+The Agent Chat panel supports provider selection, streaming responses,
+conversation threads, markdown rendering, context compaction, token accounting,
+and custom providers. It can see workspace context and can call configured tools
+when enabled.
+
+### Command Memory
+
+Command logs, terminal transcripts, snippets, command history, and workspace
+templates turn repeated agent workflows into reusable building blocks. Sensitive
+command content is scrubbed before storage where possible.
+
+## Install
+
+Install or update from the latest GitHub release with PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
 ```
 
-- The browser renders terminals with xterm.js.
-- Keystrokes travel over a WebSocket to `Wimux.Web`, which feeds them to a
-  real ConPTY-backed `TerminalSession` on Windows.
-- Raw shell output streams back over the same socket; recent output is
-  buffered server-side so a page refresh replays the screen.
-- Workspaces, surfaces (tabs) and split-pane layouts are stored as JSON in
-  `%LOCALAPPDATA%\wimux\state.json`.
+The installer downloads `wimux-win-x64.zip`, extracts it to:
 
-## Launcher (`wimux`)
+```text
+%LOCALAPPDATA%\Programs\wimux
+```
 
-The fastest way in: run `wimux` from any terminal (PowerShell, Windows Terminal,
-cmd) to open an interactive launcher menu — pick an interface and go.
+and adds that folder to your user `PATH`.
+
+Pin a release before running the installer:
+
+```powershell
+$env:WIMUX_VERSION = "v0.1.3"
+irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
+```
+
+After installation, open a new terminal:
+
+```powershell
+wimux
+```
+
+## Launcher
+
+Running `wimux` opens the launcher menu:
 
 ```text
    w i m u x
@@ -42,53 +98,206 @@ cmd) to open an interactive launcher menu — pick an interface and go.
    6. Exit
 ```
 
-- Move with the arrow keys (or `j`/`k`), select with `Enter`, or press `1`-`6`.
-- Web UI starts the host if needed and opens `http://localhost:5201`.
-- Run in Background hides wimux to the system tray with the server still up.
-- The launcher checks GitHub for newer releases in the background.
-
-### Install
-
-Install (or update) with one line in PowerShell — no .NET or Node needed,
-it downloads a self-contained build from the latest GitHub release:
+Non-interactive launcher commands:
 
 ```powershell
-irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
-```
-
-This drops wimux into `%LOCALAPPDATA%\Programs\wimux` and adds it to your PATH.
-Pin a version with `$env:WIMUX_VERSION="v0.1.0"` before running.
-
-Building from a source checkout instead? Run `./install.ps1` from the repo root
-(needs the .NET SDK + Node).
-
-Then open a new terminal and run `wimux`. Non-interactive shortcuts are also
-available for scripting:
-
-```powershell
-wimux web       # start host (if needed) + open browser
-wimux start     # start host in the background
-wimux stop      # stop the background host
-wimux status    # running / stopped
-wimux cli       # interactive wimux command console
+wimux web       # start the host if needed and open the Web UI
+wimux start     # start the host in the background
+wimux stop      # stop the launcher-started host
+wimux status    # print running or stopped
+wimux cli       # open the interactive command console
+wimux codex     # open a new surface running the codex CLI
+wimux version   # print the launcher version
 ```
 
 ## Requirements
 
-- Windows 10/11 (ConPTY is Windows-only).
-- .NET 10 SDK.
-- Node.js 20+ / npm.
+- Windows 10 or Windows 11.
+- Edge or Chrome for live browser panes.
+- For source builds: .NET 10 SDK and Node.js 20+.
 
-## Develop
+The published release is self-contained and does not require installing .NET or
+Node on the target machine.
 
-Run the backend (terminal host + API) on port 5201:
+## Architecture
+
+```text
+wimux/
+  server/
+    Wimux.Core/      terminal engine, models, settings, logs, agent services
+    Wimux.Web/       ASP.NET Core host, REST API, WebSockets, static SPA
+    Wimux.Cli/       HTTP automation CLI
+    Wimux.Launcher/  Windows launcher and tray entry point
+    Wimux.Tests/     backend and integration tests
+  web/               React + TypeScript + xterm.js frontend
+```
+
+Runtime flow:
+
+1. The launcher starts `wimux-web.exe` on `http://localhost:5201`.
+2. The Web UI is served by the same ASP.NET Core host.
+3. Terminal panes connect through `/ws/terminal/{paneId}`.
+4. Keystrokes travel over WebSocket to a ConPTY-backed terminal session.
+5. Browser panes use a dedicated Edge or Chrome profile controlled through CDP.
+6. Persistent state is stored under `%LOCALAPPDATA%\wimux`.
+
+## Features
+
+### Workspaces and Surfaces
+
+- Create, rename, select, duplicate, and close workspaces.
+- Create multiple surfaces per workspace.
+- Split panes vertically and horizontally.
+- Equalize, zoom, and rearrange layouts.
+- Persist layout and selected state across restarts.
+- Per-workspace environment variables and SSH profile snippets.
+
+### Terminal Experience
+
+- Native ConPTY sessions.
+- Shell detection for PowerShell and installed shells.
+- Working directory tracking.
+- Title, bell, and command marker support.
+- Search within the active terminal.
+- Broadcast input to all panes.
+- Quick write into the focused pane.
+- Right-click behavior tuned for mouse-aware terminal apps.
+
+### Browser Experience
+
+- Real Edge or Chrome tab streaming.
+- Dedicated browser profile under Wimux app data.
+- Back, forward, reload, close, and focus support.
+- Session restore cleanup to avoid reopening stale hidden tabs.
+- Network and cosmetic ad-block support for web panes.
+
+### Agent Workflow
+
+- Agent Chat panel with provider and model selector.
+- OpenAI, Anthropic-compatible, Gemini-compatible, and custom providers.
+- Streaming assistant messages.
+- Conversation threads with search and delete.
+- Context budgeting and compaction.
+- Token and request quota dashboard.
+- External agent session discovery and transcript parsing.
+- Workspace-aware agent context from terminal and browser panes.
+
+### Productivity Panels
+
+- Command palette.
+- Command logs by day with full-text search.
+- Command history picker.
+- Session Vault for captured terminal transcripts.
+- Snippet manager with one-click terminal insertion.
+- Workspace templates.
+- Quick open fuzzy file finder.
+- Notifications panel.
+- Settings export and import.
+
+## CLI
+
+The automation CLI is published as `wimux-cli.exe` and talks to the running web
+host over HTTP.
+
+Default host:
+
+```text
+http://localhost:5201
+```
+
+Override it with:
+
+```powershell
+$env:WIMUX_URL = "http://localhost:5201"
+```
+
+Examples:
+
+```powershell
+wimux-cli status
+wimux-cli notify --title "Agent" --body "Waiting for input"
+wimux-cli workspace list
+wimux-cli workspace create --name "My Project"
+wimux-cli workspace select --index 0
+wimux-cli surface create
+wimux-cli split right
+```
+
+When developing from source:
+
+```powershell
+cd server/Wimux.Cli
+dotnet run -- status
+```
+
+## Keyboard Shortcuts
+
+### Workspaces
+
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl+N` | New workspace |
+| `Ctrl+B` | Toggle workspace sidebar |
+| `F2` | Rename workspace |
+| `Ctrl+Shift+W` | Close workspace |
+
+### Surfaces and Panes
+
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl+T` | New surface |
+| `Ctrl+W` | Close surface |
+| `Ctrl+Tab` | Next surface |
+| `Ctrl+Shift+Tab` | Previous surface |
+| `Ctrl+D` | Split right |
+| `Ctrl+Shift+D` | Split down |
+| `Ctrl+Shift+Z` | Toggle pane zoom |
+| `Ctrl+Alt+B` | Toggle broadcast input |
+
+### Tools and Panels
+
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl+Shift+P` | Command palette |
+| `Ctrl+P` | Quick open |
+| `Ctrl+,` | Settings |
+| `Ctrl+Shift+F` | Terminal search |
+| `Ctrl+Alt+H` | Command history |
+| `Ctrl+Shift+L` | Command logs |
+| `Ctrl+Shift+V` | Session Vault |
+| `Ctrl+Shift+S` | Snippets |
+| `Ctrl+Shift+Q` | Quota dashboard |
+| `Ctrl+Shift+A` | Agent sessions |
+| `Ctrl+Shift+J` | Agent Chat |
+
+## Session Restore and Storage
+
+Wimux persists app-owned state, not arbitrary live process state.
+
+Stored under `%LOCALAPPDATA%\wimux`:
+
+- Workspace and surface layout.
+- Settings and encrypted secrets.
+- Agent conversation threads.
+- Command logs and terminal transcripts.
+- Snippets and workspace templates.
+- Browser profile data.
+- Launcher process metadata.
+
+On restart, Wimux restores the layout, metadata, and saved terminal context it
+owns. Shell processes, editors, terminal apps, and agent CLIs resume according
+to their own durability features.
+
+## Development
+
+Run the backend host:
 
 ```powershell
 cd server/Wimux.Web
 dotnet run --urls http://localhost:5201
 ```
 
-Run the frontend dev server (proxies /api and /ws to the backend) on 5173:
+Run the frontend dev server:
 
 ```powershell
 cd web
@@ -96,88 +305,69 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173.
+Open:
 
-## Production build
-
-Build the SPA into the backend's `wwwroot`, then run the single web host:
-
-```powershell
-cd web
-npm run build
-cd ../server/Wimux.Web
-dotnet run --urls http://localhost:5201
+```text
+http://localhost:5173
 ```
 
-Open http://localhost:5201 — the API, WebSocket, and UI are all served from
-one process.
+The dev server proxies `/api` and `/ws` to the backend on port `5201`.
 
-> Security note: the server exposes real shells with no authentication and
-> binds to localhost only. Do not expose it to a network without adding auth.
-
-## Features ported
-
-- Workspaces (create, select, rename, close) — `Ctrl+N`
-- Surfaces / tabs (create, select, rename, close) — `Ctrl+T`
-- Split panes, vertical and horizontal, with draggable dividers — `Ctrl+D`, `Ctrl+Shift+D`
-- Native ConPTY terminal sessions per pane, with title/cwd/bell events
-- Terminal output replay on reconnect/refresh
-- Command palette — `Ctrl+Shift+P`
-- Settings (theme, font family, font size) — `Ctrl+,`
-- Built-in terminal color themes from the original app
-- Sidebar toggle — `Ctrl+B`
-- Session layout persistence across restarts
-- Terminal notifications via OSC 9/777 + sidebar/tabbar unread badge — `Ctrl+I`
-- Command logs (per-day + full-text search), powered by shell prompt markers — `Ctrl+Shift+L`
-- Command history picker for the focused pane — `Ctrl+Alt+H`
-- Session Vault: browse captured terminal transcripts — `Ctrl+Shift+V`
-- Snippets manager with insert-into-terminal — `Ctrl+Shift+S`
-- Agent quota dashboard (tokens/requests per provider/model) — `Ctrl+Shift+Q`
-- Workspace templates + git branch/remote + listening-port detection APIs
-- Workspace shortcuts: jump `Ctrl+1..9`, rename `Ctrl+Shift+R`, close `Ctrl+Shift+W`
-- Surface cycling — `Ctrl+Shift+]` / `Ctrl+Shift+[`
-- `wimux-cli` CLI (HTTP) for automation: `notify`, `workspace`, `surface`, `split`, `status`
-- Web and notepad pane types alongside terminals (per-pane type switcher) — auto-saved notes
-- External AI agent detection + conversation viewer (Claude/Codex/Gemini/etc.) — `Ctrl+Shift+A`
-- Per-workspace environment variables (injected into new terminals) + SSH profiles — `Ctrl+Shift+E`
-- Knowledge-graph API + interactive graph view — `Ctrl+Shift+G`
-- Source tree browser with file preview — `Ctrl+Shift+O`
-- Broadcast input to all panes — `Ctrl+Alt+B`
-- In-terminal search — `Ctrl+Shift+F`
-- Quick write in the focused terminal — `Shift+W`
-- Pane focus navigation (`Ctrl+Alt+Arrow`) and zoom (`Ctrl+Shift+Z`)
-- Workspace templates browser — `Ctrl+Shift+T`
-- Built-in AI agent runtime (OpenAI/Anthropic/Gemini-compatible) with streaming chat — `Ctrl+Shift+J`
-- Agent settings (provider, model, API key, system prompt, tools) and the agent `wimux` tool bridge
-- Agent conversation thread store with markdown-rendered messages
-- Full settings (appearance/terminal/behavior) with JSON export/import
-- UI themes: Dark+ / Light / High Contrast
-- Ad block toggle for web panes (network-level blocking is desktop/WebView2-only)
-- Quick open fuzzy file finder — `Ctrl+P`
-- Custom terminal colors (background/foreground/cursor/selection)
-- Save current workspace layout as a reusable template, and apply templates to spawn new workspaces
-- Per-workspace sidebar status: git branch + unread count
-
-## CLI
-
-The `wimux-cli` CLI talks to the running web host over HTTP (default
-`http://localhost:5201`, override with `WIMUX_URL`).
+Build and install from source:
 
 ```powershell
-cd server/Wimux.Cli
-dotnet run -- status
-dotnet run -- notify --title "Claude Code" --body "Waiting for input"
-dotnet run -- workspace list
-dotnet run -- workspace create --name "My Project"
-dotnet run -- workspace select --index 0
-dotnet run -- surface create
-dotnet run -- split right
+.\install.ps1
 ```
 
+Create a release bundle:
 
+```powershell
+.\scripts\release.ps1
+```
 
+The release script creates:
 
+```text
+dist\wimux-win-x64.zip
+```
 
+## Security
 
+Wimux exposes real local shells and browser automation through a local web host.
+It is designed to bind to localhost for a trusted local user. Do not expose the
+host to a network without adding authentication and transport protection.
 
+API keys are stored through Windows DPAPI where secrets are used. Command logs
+and transcript storage include best-effort scrubbing for obvious secret
+patterns, but terminal output should still be treated as sensitive local data.
 
+## FAQ
+
+### Is Wimux a terminal or an agent orchestrator?
+
+It is a terminal workspace with automation primitives. Agents are first-class
+users of the workspace, but Wimux does not force one specific agent workflow.
+
+### Does it replace a normal terminal?
+
+It can, but it is most useful when you want terminals, browser panes,
+notifications, logs, and agent chat in one workspace.
+
+### Does it require a desktop app runtime?
+
+No. The UI is browser-based and served by a local ASP.NET Core host. The
+launcher and tray entry point are native Windows executables.
+
+### Can it run without Edge or Chrome?
+
+Terminal workspaces can run without them. Live browser panes need Edge or
+Chrome because they use the Chrome DevTools Protocol.
+
+### Can I use my own model provider?
+
+Yes. Agent settings include built-in provider groups and custom providers with
+configurable base URL, model, auth scheme, and secret name.
+
+### Where do I report issues?
+
+Use GitHub issues in this repository.
