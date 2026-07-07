@@ -488,9 +488,6 @@ function AppContent() {
 
   const terminalHeader = (
     <div className="toolbar">
-        <button className="icon-btn" onClick={() => { if (focusedPaneId) api.capturePane(focusedPaneId); }} title="Capture transcript">›</button>
-        <button className="icon-btn" onClick={() => setOverlay("history")} title="Command history (Ctrl+Alt+H)">↓</button>
-        <span className="toolbar-sep" />
         <button className="icon-btn" onClick={() => splitPane("vertical")} title="Split right (Ctrl+D)">▢▢</button>
         <button className="icon-btn" onClick={() => splitPane("horizontal")} title="Split down (Ctrl+Shift+D)">⊟</button>
         <div style={{ position: "relative" }}>
@@ -504,14 +501,11 @@ function AppContent() {
             </div>
           )}
         </div>
-        <span className="toolbar-sep" />
         <button className="icon-btn" onClick={() => applyLayout(2, 1)} title="Layout: 2 Columns">▥</button>
         <button className="icon-btn" onClick={() => applyLayout(2, 2)} title="Layout: Grid 2x2">▦</button>
         <button className="icon-btn" onClick={applyMainStackLayout} title="Layout: Main + Stack">▤</button>
-        <span className="toolbar-sep" />
         <button className="icon-btn" onClick={equalizeSurface} disabled={!canArrangePanes} title={canArrangePanes ? "Equalize panes" : "Equalize panes (needs 2+ panes)"}>≋</button>
         <button className={"icon-btn" + (zoomedPaneId ? " active-toggle" : "")} onClick={toggleZoom} disabled={!canArrangePanes} title={canArrangePanes ? "Zoom pane (Ctrl+Shift+Z)" : "Zoom pane (needs 2+ panes)"}>⤢</button>
-        <span className="toolbar-sep" />
         <button className={"icon-btn" + (broadcast ? " active-toggle" : "")} onClick={() => setBroadcast((v) => !v)} title="Broadcast input (Ctrl+Alt+B)">⌗</button>
         <div style={{ flex: 1 }} />
         <div className="tab-search">

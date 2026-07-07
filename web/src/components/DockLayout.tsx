@@ -829,6 +829,7 @@ export function DockLayout({ openPanels, uiTheme, ...ctx }: Props) {
             title,
             position,
           });
+          api.getPanel(s.id)?.api.setActive();
         } else {
           const p = api.getPanel(s.id);
           if (p && p.title !== s.name) p.api.setTitle(s.name);
