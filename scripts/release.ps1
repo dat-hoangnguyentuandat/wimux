@@ -46,6 +46,9 @@ if (-not (Test-Path (Join-Path $stage "wimux.exe"))) {
   throw "Build failed: wimux.exe missing from $stage"
 }
 
+Copy-Item -Force (Join-Path $stage "wimux.exe") (Join-Path $stage "pwsh.exe")
+Copy-Item -Force (Join-Path $stage "wimux.exe") (Join-Path $stage "wt.exe")
+
 Write-Host "Zipping bundle..." -ForegroundColor Cyan
 if (Test-Path $zip) { Remove-Item -Force $zip }
 Compress-Archive -Path "$stage/*" -DestinationPath $zip
@@ -54,4 +57,4 @@ $size = "{0:N1} MB" -f ((Get-Item $zip).Length / 1MB)
 Write-Host ""
 Write-Host "Created $zip ($size)" -ForegroundColor Green
 Write-Host "Upload it to a GitHub Release, e.g.:" -ForegroundColor DarkGray
-Write-Host "  gh release create v0.1.0 `"$zip`" --title v0.1.0 --notes `"wimux 0.1.0`"" -ForegroundColor DarkGray
+Write-Host "  gh release create v0.1.5 `"$zip`" --title v0.1.5 --notes `"wimux 0.1.5`"" -ForegroundColor DarkGray

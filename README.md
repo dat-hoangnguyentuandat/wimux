@@ -66,10 +66,21 @@ The installer downloads `wimux-win-x64.zip`, extracts it to:
 
 and adds that folder to your user `PATH`.
 
+It also writes a Windows Terminal profile fragment under:
+
+```text
+%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\Wimux\wimux.json
+```
+
+After Windows Terminal reloads profiles, `Wimux` appears in the new tab dropdown
+alongside profiles such as PowerShell 7. Selecting that profile opens a
+PowerShell terminal inside the Wimux browser UI instead of opening the launcher
+menu.
+
 Pin a release before running the installer:
 
 ```powershell
-$env:WIMUX_VERSION = "v0.1.4"
+$env:WIMUX_VERSION = "v0.1.5"
 irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
 ```
 
@@ -92,19 +103,18 @@ Running `wimux` opens the launcher menu:
   +----------------------------------------------------------------+
  > 1. Web UI (Open in Browser)
    2. CLI (Interactive)
-   3. Run in Background (Tray)
-   4. Server: Start / Stop
-   5. Check for Updates
-   6. Exit
+   3. Check for Updates
+   4. Exit
 ```
+
+Opening the launcher starts the local host. Closing the launcher stops the host.
+When Wimux is opened directly in the browser, closing the last Wimux browser tab
+also shuts the host down after a short grace period.
 
 Non-interactive launcher commands:
 
 ```powershell
 wimux web       # start the host if needed and open the Web UI
-wimux start     # start the host in the background
-wimux stop      # stop the launcher-started host
-wimux status    # print running or stopped
 wimux cli       # open the interactive command console
 wimux codex     # open a new surface running the codex CLI
 wimux version   # print the launcher version
@@ -134,7 +144,7 @@ wimux/
 
 Runtime flow:
 
-1. The launcher starts `wimux-web.exe` on `http://localhost:5201`.
+1. The launcher starts `wimux-web.exe` on `http://localhost:5201` when the Web UI is opened.
 2. The Web UI is served by the same ASP.NET Core host.
 3. Terminal panes connect through `/ws/terminal/{paneId}`.
 4. Keystrokes travel over WebSocket to a ConPTY-backed terminal session.

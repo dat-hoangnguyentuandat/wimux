@@ -21,6 +21,8 @@ builder.Services.AddSingleton<Wimux.Core.Services.AgentConversationStoreService>
 builder.Services.AddSingleton<Wimux.Core.Services.AgentQuotaService>();
 builder.Services.AddSingleton<Wimux.Web.Services.AgentRuntimeService>();
 builder.Services.AddSingleton<TerminalSessionManager>();
+builder.Services.AddSingleton<BrowserSessionService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<BrowserSessionService>());
 builder.Services.AddSingleton<Wimux.Web.Services.Browser.IBrowserProvider>(_ => new Wimux.Web.Services.Browser.ChromeCdpProvider());
 builder.Services.AddSingleton<Wimux.Web.Services.Browser.BrowserManager>();
 builder.Services.AddHttpClient("frame-proxy", client =>
@@ -56,6 +58,21 @@ var json = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.C
 
 // ── State ───────────────────────────────────────────────────────────
 app.MapGet("/api/state", (AppStateStore store) => Results.Json(store.State, json));
+app.MapPost("/api/browser-session/open", (BrowserSessionService sessions, BrowserSessionReq req) =>
+{
+    sessions.Open(req.Id);
+    return Results.Json(new { ok = true, active = sessions.ActiveCount }, json);
+});
+app.MapPost("/api/browser-session/ping", (BrowserSessionService sessions, BrowserSessionReq req) =>
+{
+    sessions.Ping(req.Id);
+    return Results.Json(new { ok = true, active = sessions.ActiveCount }, json);
+});
+app.MapPost("/api/browser-session/close", (BrowserSessionService sessions, BrowserSessionReq req) =>
+{
+    sessions.Close(req.Id);
+    return Results.Json(new { ok = true, active = sessions.ActiveCount }, json);
+});
 
 app.MapPost("/api/workspaces", (AppStateStore store, CreateWorkspaceReq req) =>
 {
@@ -128,6 +145,7 @@ app.MapPost("/api/workspaces/{wsId}/surfaces", (AppStateStore store, string wsId
     {
         Type = paneType,
         Shell = paneType == "terminal" ? req?.Shell : null,
+        WorkingDirectory = paneType == "terminal" ? req?.WorkingDirectory : null,
         Url = paneType == "web" ? req?.Url : null,
         Title = paneType == "web" ? "Browser" : null,
     };
@@ -758,15 +776,20 @@ app.Map("/ws/terminal/{paneId}", async (HttpContext ctx, TerminalSessionManager 
 
     var existed = term.Exists(paneId);
     string? startCommand = null;
+    string? paneCwd = null;
     if (!string.IsNullOrWhiteSpace(shellArg)) startCommand = shellArg;
     else
     {
         foreach (var ws2 in store.State.Workspaces)
             foreach (var s2 in ws2.Surfaces)
-                if (s2.Panes.TryGetValue(paneId, out var p2) && !string.IsNullOrWhiteSpace(p2.Shell))
-                    startCommand = p2.Shell;
+                if (s2.Panes.TryGetValue(paneId, out var p2))
+                {
+                    if (!string.IsNullOrWhiteSpace(p2.Shell))
+                        startCommand = p2.Shell;
+                    paneCwd = p2.WorkingDirectory;
+                }
     }
-    term.GetOrCreate(paneId, cols, rows, cwd, startCommand);
+    term.GetOrCreate(paneId, cols, rows, string.IsNullOrWhiteSpace(cwd) ? paneCwd : cwd, startCommand);
 
     // Replay buffered output so reconnects/refreshes see prior content.
     var recent = term.GetRecentOutput(paneId);
@@ -1061,8 +1084,9 @@ app.Run();
 
 // ── Request records ─────────────────────────────────────────────────
 record CreateWorkspaceReq(string? Name, string? WorkingDirectory);
+record BrowserSessionReq(string Id);
 record UpdateWorkspaceReq(string? Name, string? AccentColor, string? WorkingDirectory);
-record CreateSurfaceReq(string? Name, string? Shell, string? Type, string? Url);
+record CreateSurfaceReq(string? Name, string? Shell, string? Type, string? Url, string? WorkingDirectory);
 record RenameReq(string Name);
 record SplitReq(string PaneId, string Direction, string? Shell, string? Type, string? Url);
 record RatioReq(string NodeId, double Ratio);

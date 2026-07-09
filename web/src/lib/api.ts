@@ -55,8 +55,19 @@ const j = { "Content-Type": "application/json" };
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
-  if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${url} -> ${res.status}`);
   const text = await res.text();
+  if (!res.ok) {
+    let message = `${init?.method ?? "GET"} ${url} -> ${res.status}`;
+    if (text) {
+      try {
+        const body = JSON.parse(text);
+        message = body?.error || body?.message || message;
+      } catch {
+        message = text;
+      }
+    }
+    throw new Error(message);
+  }
   return text ? (JSON.parse(text) as T) : (undefined as T);
 }
 
@@ -66,6 +77,19 @@ export const api = {
   getSettings: () => req<any>("/api/settings"),
   saveSettings: (s: any) => req<any>("/api/settings", { method: "PUT", headers: j, body: JSON.stringify(s) }),
   getShells: () => req<{ name: string; path: string }[]>("/api/shells"),
+  openBrowserSession: (id: string) =>
+    req<{ ok: boolean; active: number }>("/api/browser-session/open", { method: "POST", headers: j, body: JSON.stringify({ id }) }),
+  pingBrowserSession: (id: string) =>
+    req<{ ok: boolean; active: number }>("/api/browser-session/ping", { method: "POST", headers: j, body: JSON.stringify({ id }) }),
+  closeBrowserSession: (id: string) => {
+    const body = JSON.stringify({ id });
+    if (navigator.sendBeacon) {
+      const blob = new Blob([body], { type: "application/json" });
+      if (navigator.sendBeacon("/api/browser-session/close", blob))
+        return Promise.resolve(undefined as void);
+    }
+    return req<void>("/api/browser-session/close", { method: "POST", headers: j, body, keepalive: true });
+  },
 
   createWorkspace: (name?: string, workingDirectory?: string) =>
     req<Workspace>("/api/workspaces", { method: "POST", headers: j, body: JSON.stringify({ name, workingDirectory }) }),

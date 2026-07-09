@@ -108,6 +108,25 @@ function AppContent() {
   }, [refresh, refreshUnread, applySettings]);
 
   useEffect(() => {
+    const id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    api.openBrowserSession(id).catch(() => {});
+    const ping = window.setInterval(() => {
+      api.pingBrowserSession(id).catch(() => {});
+    }, 8000);
+    const close = () => {
+      void api.closeBrowserSession(id);
+    };
+    window.addEventListener("pagehide", close);
+    window.addEventListener("beforeunload", close);
+    return () => {
+      window.clearInterval(ping);
+      close();
+      window.removeEventListener("pagehide", close);
+      window.removeEventListener("beforeunload", close);
+    };
+  }, []);
+
+  useEffect(() => {
     const suppressBrowserContextMenu = (e: MouseEvent) => {
       e.preventDefault();
     };
@@ -528,7 +547,10 @@ function AppContent() {
   if (!state) return <div className="loading">Loading wimux...</div>;
 
   return (
-    <div className="app-shell" onClick={() => { if (openMenu) setOpenMenu(null); if (surfaceMenu) setSurfaceMenu(null); if (shellMenuOpen) setShellMenuOpen(false); }}>
+    <div
+      className="app-shell"
+      onClick={() => { if (openMenu) setOpenMenu(null); if (surfaceMenu) setSurfaceMenu(null); if (shellMenuOpen) setShellMenuOpen(false); }}
+    >
       <div className="menubar">
         <span className="menubar-brand">wimux</span>
         {Object.keys(menus).map((m) => (

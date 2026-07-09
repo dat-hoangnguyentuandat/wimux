@@ -17,12 +17,10 @@ internal sealed class Menu
     {
         _items = new (string, string, Func<bool>)[]
         {
-            ("Web UI (Open in Browser)", "Start the host and open wimux in your browser", OpenWeb),
+            ("Web UI (Open in Browser)", "Open wimux in your browser",                   OpenWeb),
             ("CLI (Interactive)",        "Open the interactive wimux command console",      OpenCli),
-            ("Run in Background (Tray)", "Hide to the system tray, keep the server up",     OpenTray),
-            ("Server: Start / Stop",     "Toggle the wimux web host",                       ToggleServer),
             ("Check for Updates",        "Check GitHub for a newer wimux release",          CheckUpdate),
-            ("Exit",                     "Quit the launcher (server keeps running)",        Exit),
+            ("Exit",                     "Quit the launcher",                               Exit),
         };
     }
 
@@ -157,7 +155,7 @@ internal sealed class Menu
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine("  " + _items[_selected].Hint);
         Console.WriteLine();
-        Console.WriteLine("  Up/Down to move - Enter to select - 1-6 quick keys - Esc to quit");
+        Console.WriteLine($"  Up/Down to move - Enter to select - 1-{_items.Length} quick keys - Esc to quit");
         if (_status != null)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
@@ -190,11 +188,6 @@ internal sealed class Menu
 
     private bool OpenWeb()
     {
-        if (!ServerManager.EnsureRunning())
-        {
-            Pause("Failed to start the server.");
-            return true;
-        }
         BrowserLauncher.Open(ServerManager.Url);
         Pause($"Opened {ServerManager.Url} in your browser.");
         return true;
@@ -202,29 +195,7 @@ internal sealed class Menu
 
     private bool OpenCli()
     {
-        if (!ServerManager.EnsureRunning())
-        {
-            Pause("Failed to start the server.");
-            return true;
-        }
         InteractiveCli.Run();
-        return true;
-    }
-
-    private bool OpenTray()
-    {
-        Tray.Run();
-        // Tray.Run blocks until the user exits the tray; then quit the launcher.
-        return false;
-    }
-
-    private bool ToggleServer()
-    {
-        if (ServerManager.IsRunning())
-            ServerManager.Stop();
-        else
-            ServerManager.EnsureRunning();
-        Pause(null);
         return true;
     }
 
@@ -264,7 +235,7 @@ internal sealed class Menu
 
     private bool Exit()
     {
-        Console.WriteLine("Bye. The server keeps running; use 'wimux stop' to shut it down.");
+        Console.WriteLine("Bye.");
         return false;
     }
 
