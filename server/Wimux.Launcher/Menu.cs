@@ -188,6 +188,11 @@ internal sealed class Menu
 
     private bool OpenWeb()
     {
+        if (!ServerManager.EnsureRunning())
+        {
+            Pause("Failed to start the server.");
+            return true;
+        }
         BrowserLauncher.Open(ServerManager.Url);
         Pause($"Opened {ServerManager.Url} in your browser.");
         return true;
@@ -195,6 +200,11 @@ internal sealed class Menu
 
     private bool OpenCli()
     {
+        if (!ServerManager.EnsureRunning())
+        {
+            Pause("Failed to start the server.");
+            return true;
+        }
         InteractiveCli.Run();
         return true;
     }
