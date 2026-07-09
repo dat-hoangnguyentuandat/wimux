@@ -12,7 +12,7 @@ namespace Wimux.Launcher;
 /// </summary>
 internal static class Program
 {
-    internal const string CurrentVersion = "0.1.5";
+    internal const string CurrentVersion = "0.1.6";
 
     [STAThread]
     private static int Main(string[] args)
@@ -20,9 +20,6 @@ internal static class Program
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
         var invokedAs = Path.GetFileNameWithoutExtension(Environment.ProcessPath ?? Environment.GetCommandLineArgs().FirstOrDefault() ?? "");
-        if (string.Equals(invokedAs, "pwsh", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(invokedAs, "powershell", StringComparison.OrdinalIgnoreCase))
-            return RunLauncher.OpenPowerShell(args);
         if (string.Equals(invokedAs, "wt", StringComparison.OrdinalIgnoreCase))
             return RunLauncher.OpenWindowsTerminal(args);
 
@@ -39,7 +36,7 @@ internal static class Program
             if (stopped)
                 return;
             stopped = true;
-            ServerManager.Stop();
+            ServerManager.Stop(quiet: true);
         }
 
         Console.CancelKeyPress += (_, e) =>
@@ -78,9 +75,6 @@ internal static class Program
                 return CodexLauncher.Open(args.Skip(1).ToArray());
             case "run":
                 return RunLauncher.Open(args.Skip(1).ToArray());
-            case "pwsh":
-            case "powershell":
-                return RunLauncher.OpenPowerShell(args.Skip(1).ToArray());
             case "wt":
                 return RunLauncher.OpenWindowsTerminal(args.Skip(1).ToArray());
             case "update":
@@ -113,7 +107,6 @@ internal static class Program
               wimux cli          Open the interactive CLI
               wimux codex [args] Open a wimux web terminal running `codex`
               wimux run -- <cmd> Open any command as a wimux terminal
-              wimux pwsh [args]  Open PowerShell Core as a wimux terminal
               wimux wt [args]    Accept basic Windows Terminal args and open in wimux
               wimux update       Install the latest GitHub release if newer
               wimux version      Print version

@@ -20,14 +20,6 @@ internal static class RunLauncher
         return OpenCommand(parsed.Name ?? GuessName(parsed.Command), parsed.Cwd, BuildCommandLine(parsed.Command));
     }
 
-    internal static int OpenPowerShell(string[] args)
-    {
-        var pwsh = ResolvePowerShellExecutable();
-        var command = new List<string> { pwsh };
-        command.AddRange(args);
-        return OpenCommand("PowerShell", Environment.CurrentDirectory, BuildCommandLine(command));
-    }
-
     internal static int OpenWindowsTerminal(string[] args)
     {
         var parsed = ParseWindowsTerminalArgs(args);

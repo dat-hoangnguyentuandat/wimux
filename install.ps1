@@ -2,8 +2,8 @@
 #
 #   ./install.ps1                         # build Release, install for current user
 #   ./install.ps1 -NoBuild                # skip build, just (re)install PATH entry
-#   ./install.ps1 -InstallTerminalShims    # also put wimux first on PATH for pwsh.exe/wt.exe
-#   ./install.ps1 -InstallTerminalAppPaths # override Windows App Paths for pwsh.exe/wt.exe
+#   ./install.ps1 -InstallTerminalShims    # also put wimux first on PATH for wt.exe
+#   ./install.ps1 -InstallTerminalAppPaths # override Windows App Paths for wt.exe
 #   ./install.ps1 -RestoreTerminalAppPaths # restore backed-up App Paths
 #
 # After install, open a new terminal and run:  wimux
@@ -125,6 +125,39 @@ function Get-RegistryDefaultValue {
   }
 }
 
+function Test-WimuxShimDirectory {
+  param([string]$Value)
+
+  if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
+  try { $dir = [System.IO.Path]::GetFullPath($Value) } catch { return $false }
+  return Test-Path (Join-Path $dir "wimux.exe")
+}
+
+function Test-WimuxShimValue {
+  param(
+    [string]$Value,
+    [string]$Name
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
+  try { $full = [System.IO.Path]::GetFullPath($Value) } catch { return $false }
+  if (-not [string]::Equals((Split-Path -Leaf $full), $Name, [System.StringComparison]::OrdinalIgnoreCase)) { return $false }
+  return Test-WimuxShimDirectory (Split-Path -Parent $full)
+}
+
+function Remove-RegistryDefaultValue {
+  param([Parameter(Mandatory = $true)][string]$KeyPath)
+
+  $relative = $KeyPath -replace '^HKCU:\\', ''
+  $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($relative, $true)
+  if (-not $key) { return }
+  try {
+    $key.DeleteValue("", $false)
+  } finally {
+    $key.Dispose()
+  }
+}
+
 function Install-AppPathShim {
   param(
     [Parameter(Mandatory = $true)][string]$Name,
@@ -137,10 +170,19 @@ function Install-AppPathShim {
   $current = Get-ItemProperty -Path $keyPath -ErrorAction SilentlyContinue
   New-Item -Path $keyPath -Force | Out-Null
 
-  if ($defaultValue -and $defaultValue -ne $TargetExe -and -not $current.WimuxOriginalDefault) {
+  if ($current.WimuxOriginalDefault -and (Test-WimuxShimValue $current.WimuxOriginalDefault $Name)) {
+    Remove-ItemProperty -Path $keyPath -Name "WimuxOriginalDefault" -ErrorAction SilentlyContinue
+    $current = Get-ItemProperty -Path $keyPath -ErrorAction SilentlyContinue
+  }
+  if ($current.WimuxOriginalPath -and (Test-WimuxShimDirectory $current.WimuxOriginalPath)) {
+    Remove-ItemProperty -Path $keyPath -Name "WimuxOriginalPath" -ErrorAction SilentlyContinue
+    $current = Get-ItemProperty -Path $keyPath -ErrorAction SilentlyContinue
+  }
+
+  if ($defaultValue -and $defaultValue -ne $TargetExe -and -not (Test-WimuxShimValue $defaultValue $Name) -and -not $current.WimuxOriginalDefault) {
     New-ItemProperty -Path $keyPath -Name "WimuxOriginalDefault" -Value $defaultValue -PropertyType String -Force | Out-Null
   }
-  if ($current.Path -and $current.Path -ne $TargetDir -and -not $current.WimuxOriginalPath) {
+  if ($current.Path -and $current.Path -ne $TargetDir -and -not (Test-WimuxShimDirectory $current.Path) -and -not $current.WimuxOriginalPath) {
     New-ItemProperty -Path $keyPath -Name "WimuxOriginalPath" -Value $current.Path -PropertyType String -Force | Out-Null
   }
 
@@ -149,21 +191,105 @@ function Install-AppPathShim {
 }
 
 function Restore-AppPathShim {
-  param([Parameter(Mandatory = $true)][string]$Name)
+  param(
+    [Parameter(Mandatory = $true)][string]$Name,
+    [Parameter(Mandatory = $true)][string]$InstallDir
+  )
 
   $keyPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\$Name"
   $current = Get-ItemProperty -Path $keyPath -ErrorAction SilentlyContinue
   if (-not $current) { return }
 
-  if ($current.WimuxOriginalDefault) {
+  $defaultValue = Get-RegistryDefaultValue $keyPath
+  if ($current.WimuxOriginalDefault -and -not (Test-WimuxShimValue $current.WimuxOriginalDefault $Name)) {
     Set-RegistryDefaultValue $keyPath $current.WimuxOriginalDefault
     Remove-ItemProperty -Path $keyPath -Name "WimuxOriginalDefault" -ErrorAction SilentlyContinue
+  } else {
+    Remove-ItemProperty -Path $keyPath -Name "WimuxOriginalDefault" -ErrorAction SilentlyContinue
+    if ($defaultValue -and (([string]$defaultValue).StartsWith($InstallDir, [System.StringComparison]::OrdinalIgnoreCase) -or (Test-WimuxShimValue $defaultValue $Name))) {
+      Remove-RegistryDefaultValue $keyPath
+    }
   }
-  if ($current.WimuxOriginalPath) {
+  if ($current.WimuxOriginalPath -and -not (Test-WimuxShimDirectory $current.WimuxOriginalPath)) {
     New-ItemProperty -Path $keyPath -Name "Path" -Value $current.WimuxOriginalPath -PropertyType String -Force | Out-Null
     Remove-ItemProperty -Path $keyPath -Name "WimuxOriginalPath" -ErrorAction SilentlyContinue
+  } else {
+    Remove-ItemProperty -Path $keyPath -Name "WimuxOriginalPath" -ErrorAction SilentlyContinue
+    if ($current.Path -and (([string]$current.Path).StartsWith($InstallDir, [System.StringComparison]::OrdinalIgnoreCase) -or (Test-WimuxShimDirectory $current.Path))) {
+      Remove-ItemProperty -Path $keyPath -Name "Path" -ErrorAction SilentlyContinue
+    }
   }
 }
+
+function Remove-TerminalShimFiles {
+  param(
+    [Parameter(Mandatory = $true)][string]$InstallDir,
+    [Parameter(Mandatory = $true)][string[]]$Names
+  )
+
+  foreach ($name in $Names) {
+    Remove-Item -Path (Join-Path $InstallDir $name) -Force -ErrorAction SilentlyContinue
+  }
+}
+
+function Restore-TerminalShimPath {
+  param([Parameter(Mandatory = $true)][string]$InstallDir)
+
+  $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+  $parts = @($userPath -split ";" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and $_ -ne $InstallDir })
+  $newParts = if (Test-Path $InstallDir) { $parts + @($InstallDir) } else { $parts }
+  $newPath = $newParts -join ";"
+  [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+
+  $env:Path = ($env:Path -split ";" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and $_ -ne $InstallDir }) -join ";"
+  if ((Test-Path $InstallDir) -and $env:Path) {
+    $env:Path = "$env:Path;$InstallDir"
+  } elseif (Test-Path $InstallDir) {
+    $env:Path = $InstallDir
+  }
+}
+
+function Write-TerminalShimResolutionWarnings {
+  param(
+    [Parameter(Mandatory = $true)][string]$InstallDir,
+    [Parameter(Mandatory = $true)][string[]]$Names
+  )
+
+  foreach ($name in $Names) {
+    $expected = Join-Path $InstallDir $name
+    $resolved = @(where.exe $name 2>$null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($resolved.Count -eq 0) { continue }
+
+    if (-not [string]::Equals($resolved[0], $expected, [System.StringComparison]::OrdinalIgnoreCase)) {
+      Write-Host "$name may still open outside Wimux for apps that search PATH or use an explicit executable path." -ForegroundColor Yellow
+      Write-Host "  first resolved executable: $($resolved[0])" -ForegroundColor DarkYellow
+      Write-Host "  Wimux shim: $expected" -ForegroundColor DarkYellow
+    }
+  }
+}
+
+function Set-TerminalShimPathFirst {
+  param([Parameter(Mandatory = $true)][string]$InstallDir)
+
+  $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+  $parts = @($userPath -split ";" | Where-Object {
+    -not [string]::IsNullOrWhiteSpace($_) -and
+    $_ -ne $InstallDir -and
+    -not (Test-WimuxShimDirectory $_)
+  })
+  $newPath = (@($InstallDir) + $parts) -join ";"
+  [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+
+  $processParts = @($env:Path -split ";" | Where-Object {
+    -not [string]::IsNullOrWhiteSpace($_) -and
+    $_ -ne $InstallDir -and
+    -not (Test-WimuxShimDirectory $_)
+  })
+  $env:Path = (@($InstallDir) + $processParts) -join ";"
+}
+
+$terminalShimNames = @("wt.exe")
+$legacyTerminalShimNames = @("cmd.exe", "pwsh.exe")
 
 if (-not $NoBuild) {
   Write-Host "Building wimux (launcher + web host + CLI)..." -ForegroundColor Cyan
@@ -182,7 +308,6 @@ if (-not $NoBuild) {
   dotnet publish "$root/server/Wimux.Web/Wimux.Web.csproj"           -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o "$dist" | Out-Host
   dotnet publish "$root/server/Wimux.Cli/Wimux.Cli.csproj"           -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o "$dist" | Out-Host
 
-  Copy-Item -Force (Join-Path $dist "wimux.exe") (Join-Path $dist "pwsh.exe")
   Copy-Item -Force (Join-Path $dist "wimux.exe") (Join-Path $dist "wt.exe")
 }
 
@@ -201,33 +326,36 @@ if (($userPath -split ";") -notcontains $dist) {
   Write-Host "$dist already on PATH." -ForegroundColor DarkGray
 }
 
-if (-not (Test-Path (Join-Path $dist "pwsh.exe"))) {
-  Copy-Item -Force (Join-Path $dist "wimux.exe") (Join-Path $dist "pwsh.exe")
-  Copy-Item -Force (Join-Path $dist "wimux.exe") (Join-Path $dist "wt.exe")
+foreach ($name in $terminalShimNames) {
+  if (-not (Test-Path (Join-Path $dist $name))) {
+    Copy-Item -Force (Join-Path $dist "wimux.exe") (Join-Path $dist $name)
+  }
 }
 
 if ($InstallTerminalShims) {
-  $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-  $parts = @($userPath -split ";" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and $_ -ne $dist })
-  $newPath = (@($dist) + $parts) -join ";"
-  [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+  Set-TerminalShimPathFirst $dist
   Write-Host "Added wimux dist first on PATH for terminal shims: $dist" -ForegroundColor Green
-  Write-Host "Apps that launch pwsh.exe or wt.exe from PATH can now open in wimux." -ForegroundColor Green
+  Write-Host "Apps that launch wt.exe from PATH can now open in wimux." -ForegroundColor Green
 } else {
-  Write-Host "Terminal shims are available as pwsh.exe/wt.exe in: $dist" -ForegroundColor DarkGray
-  Write-Host "Run ./install.ps1 -NoBuild -InstallTerminalShims to make pwsh.exe/wt.exe open in wimux." -ForegroundColor DarkGray
+  Write-Host "Terminal shim is available as wt.exe in: $dist" -ForegroundColor DarkGray
+  Write-Host "Run ./install.ps1 -NoBuild -InstallTerminalShims to make wt.exe open in wimux." -ForegroundColor DarkGray
 }
 
 if ($RestoreTerminalAppPaths) {
-  Restore-AppPathShim "pwsh.exe"
-  Restore-AppPathShim "wt.exe"
-  Write-Host "Restored original App Paths for pwsh.exe/wt.exe." -ForegroundColor Green
+  foreach ($name in (@($terminalShimNames) + @($legacyTerminalShimNames))) {
+    Restore-AppPathShim $name $dist
+  }
+  Restore-TerminalShimPath $dist
+  Remove-TerminalShimFiles $dist (@($terminalShimNames) + @($legacyTerminalShimNames))
+  Write-Host "Restored original App Paths for wt.exe." -ForegroundColor Green
 }
 
 if ($InstallTerminalAppPaths) {
-  Install-AppPathShim "pwsh.exe" (Join-Path $dist "pwsh.exe") $dist
-  Install-AppPathShim "wt.exe" (Join-Path $dist "wt.exe") $dist
-  Write-Host "Overrode HKCU App Paths for pwsh.exe/wt.exe to wimux shims." -ForegroundColor Green
+  foreach ($name in $terminalShimNames) {
+    Install-AppPathShim $name (Join-Path $dist $name) $dist
+  }
+  Write-Host "Overrode HKCU App Paths for wt.exe to the wimux shim." -ForegroundColor Green
+  Write-TerminalShimResolutionWarnings $dist $terminalShimNames
   Write-Host "Restart the desktop app so it reads the updated launch rules." -ForegroundColor Green
 }
 

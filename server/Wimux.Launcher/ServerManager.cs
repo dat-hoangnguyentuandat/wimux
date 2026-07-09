@@ -144,11 +144,12 @@ internal static class ServerManager
     }
 
     /// <summary>Stops the host that this launcher started, if any.</summary>
-    internal static bool Stop()
+    internal static bool Stop(bool quiet = false)
     {
         if (!IsRunning())
         {
-            Console.WriteLine("wimux server is not running.");
+            if (!quiet)
+                Console.WriteLine("wimux server is not running.");
             return true;
         }
 
@@ -162,7 +163,8 @@ internal static class ServerManager
                     proc.Kill(entireProcessTree: true);
                     proc.WaitForExit(5000);
                     File.Delete(PidFile);
-                    Console.WriteLine("wimux server stopped.");
+                    if (!quiet)
+                        Console.WriteLine("wimux server stopped.");
                     return true;
                 }
                 catch (ArgumentException) { /* pid gone */ }

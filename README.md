@@ -77,31 +77,34 @@ alongside profiles such as PowerShell 7. Selecting that profile opens a
 PowerShell terminal inside the Wimux browser UI instead of opening the launcher
 menu.
 
-The installer does not override the user's default `wt.exe` or `pwsh.exe`.
-Terminal shims for desktop apps are opt-in. To route apps that launch `wt.exe`
-or `pwsh.exe` into Wimux, install with:
+The installer does not override the user's default `wt.exe`. The Windows
+Terminal shim for desktop apps is opt-in. To route apps that launch `wt.exe`
+through Windows App Paths into Wimux, install with:
 
 ```powershell
-$env:WIMUX_ENABLE_TERMINAL_SHIMS = "1"
-irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install_wt.ps1 | iex
+```
+
+Restore the user's normal `wt.exe` defaults with:
+
+```powershell
+irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/restore_wt.ps1 | iex
 ```
 
 When working from a source checkout, the equivalent local commands are:
 
 ```powershell
 .\install.ps1 -NoBuild -InstallTerminalShims -InstallTerminalAppPaths
-```
-
-Restore the user's normal `wt.exe` / `pwsh.exe` defaults with:
-
-```powershell
 .\install.ps1 -NoBuild -RestoreTerminalAppPaths
 ```
+
+Wimux does not intercept `cmd.exe` or `pwsh.exe` because those commands are too
+commonly used by system scripts and desktop apps.
 
 Pin a release before running the installer:
 
 ```powershell
-$env:WIMUX_VERSION = "v0.1.5"
+$env:WIMUX_VERSION = "v0.1.6"
 irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
 ```
 
