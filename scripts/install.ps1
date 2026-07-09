@@ -143,6 +143,7 @@ function Install-AppPathShim {
 
 $repo    = if ($env:WIMUX_REPO)    { $env:WIMUX_REPO }    else { "dat-hoangnguyentuandat/wimux" }
 $version = if ($env:WIMUX_VERSION) { $env:WIMUX_VERSION } else { "latest" }
+$enableTerminalShims = ($env:WIMUX_ENABLE_TERMINAL_SHIMS -match '^(1|true|yes)$')
 $runtime = "win-x64"
 $asset   = "wimux-$runtime.zip"
 $dest    = Join-Path $env:LOCALAPPDATA "Programs\wimux"
@@ -196,19 +197,34 @@ if (-not (Test-Path (Join-Path $dest "wt.exe"))) {
   Copy-Item -Force (Join-Path $dest "wimux.exe") (Join-Path $dest "wt.exe")
 }
 
-# Put the install directory first on user PATH so shim names win over WindowsApps.
+# Keep the normal user PATH behavior safe by default. Terminal shims are opt-in
+# because putting Wimux before WindowsApps would globally intercept wt.exe/pwsh.exe.
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-$parts = @($userPath -split ";" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and $_ -ne $dest })
-$newPath = (@($dest) + $parts) -join ";"
-[Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-$env:Path = "$dest;$env:Path"
-Write-Host "Added $dest first on your user PATH." -ForegroundColor Green
+if ($enableTerminalShims) {
+  $parts = @($userPath -split ";" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and $_ -ne $dest })
+  $newPath = (@($dest) + $parts) -join ";"
+  [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+  $env:Path = "$dest;$env:Path"
+  Write-Host "Added $dest first on your user PATH for terminal shims." -ForegroundColor Green
+} elseif (($userPath -split ";") -notcontains $dest) {
+  $newPath = if ([string]::IsNullOrEmpty($userPath)) { $dest } else { "$userPath;$dest" }
+  [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+  $env:Path = "$env:Path;$dest"
+  Write-Host "Added $dest to your user PATH." -ForegroundColor Green
+} else {
+  Write-Host "$dest already on PATH." -ForegroundColor DarkGray
+}
 
 Install-WindowsTerminalProfile -InstallDir $dest
 Install-WindowsTerminalSettingsProfile -InstallDir $dest
-Install-AppPathShim "pwsh.exe" (Join-Path $dest "pwsh.exe") $dest
-Install-AppPathShim "wt.exe" (Join-Path $dest "wt.exe") $dest
-Write-Host "Configured pwsh.exe/wt.exe shims for desktop app integration." -ForegroundColor Green
+if ($enableTerminalShims) {
+  Install-AppPathShim "pwsh.exe" (Join-Path $dest "pwsh.exe") $dest
+  Install-AppPathShim "wt.exe" (Join-Path $dest "wt.exe") $dest
+  Write-Host "Configured pwsh.exe/wt.exe shims for desktop app integration." -ForegroundColor Green
+} else {
+  Write-Host "Terminal shims were not enabled, so wt.exe/pwsh.exe defaults were left unchanged." -ForegroundColor DarkGray
+  Write-Host "To opt in later: `$env:WIMUX_ENABLE_TERMINAL_SHIMS='1'; irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex" -ForegroundColor DarkGray
+}
 
 $ver = & (Join-Path $dest "wimux.exe") version
 Write-Host ""

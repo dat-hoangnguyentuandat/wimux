@@ -77,6 +77,15 @@ alongside profiles such as PowerShell 7. Selecting that profile opens a
 PowerShell terminal inside the Wimux browser UI instead of opening the launcher
 menu.
 
+The installer does not override the user's default `wt.exe` or `pwsh.exe`.
+Terminal shims for desktop apps are opt-in. To route apps that launch `wt.exe`
+or `pwsh.exe` into Wimux, install with:
+
+```powershell
+$env:WIMUX_ENABLE_TERMINAL_SHIMS = "1"
+irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
+```
+
 Pin a release before running the installer:
 
 ```powershell
