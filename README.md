@@ -86,6 +86,18 @@ $env:WIMUX_ENABLE_TERMINAL_SHIMS = "1"
 irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
 ```
 
+When working from a source checkout, the equivalent local commands are:
+
+```powershell
+.\install.ps1 -NoBuild -InstallTerminalShims -InstallTerminalAppPaths
+```
+
+Restore the user's normal `wt.exe` / `pwsh.exe` defaults with:
+
+```powershell
+.\install.ps1 -NoBuild -RestoreTerminalAppPaths
+```
+
 Pin a release before running the installer:
 
 ```powershell
