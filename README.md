@@ -104,7 +104,7 @@ commonly used by system scripts and desktop apps.
 Pin a release before running the installer:
 
 ```powershell
-$env:WIMUX_VERSION = "v0.1.6"
+$env:WIMUX_VERSION = "v0.1.7"
 irm https://raw.githubusercontent.com/dat-hoangnguyentuandat/wimux/main/scripts/install.ps1 | iex
 ```
 

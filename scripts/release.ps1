@@ -56,4 +56,4 @@ $size = "{0:N1} MB" -f ((Get-Item $zip).Length / 1MB)
 Write-Host ""
 Write-Host "Created $zip ($size)" -ForegroundColor Green
 Write-Host "Upload it to a GitHub Release, e.g.:" -ForegroundColor DarkGray
-Write-Host "  gh release create v0.1.6 `"$zip`" --title v0.1.6 --notes `"wimux 0.1.6`"" -ForegroundColor DarkGray
+Write-Host "  gh release create v0.1.7 `"$zip`" --title v0.1.7 --notes `"wimux 0.1.7`"" -ForegroundColor DarkGray

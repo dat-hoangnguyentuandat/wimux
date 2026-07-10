@@ -12,7 +12,7 @@ namespace Wimux.Launcher;
 /// </summary>
 internal static class Program
 {
-    internal const string CurrentVersion = "0.1.6";
+    internal const string CurrentVersion = "0.1.7";
 
     [STAThread]
     private static int Main(string[] args)
